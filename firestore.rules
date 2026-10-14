@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// INTAL PRO – Firestore Security Rules (Faza 1)
+// INTAL PRO – Firestore Security Rules (Faza 1–2)
 // Lejet e roleve zbatohen këtu, jo vetëm në UI. Çdo gjë që nuk lejohet
 // shprehimisht është e ndaluar.
 
@@ -21,6 +21,98 @@ service cloud.firestore {
     }
     function hasRole(companyId, roles) { return isMember(companyId) && me().roli in roles; }
     function isAdmin(companyId) { return hasRole(companyId, ['admin']); }
+
+    function companyPath(companyId, col, id) {
+      return /databases/$(database)/documents/companies/$(companyId)/$(col)/$(id);
+    }
+    function changedKeys() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    function counterIncreases() {
+      return request.resource.data.next is int
+        && (resource == null || request.resource.data.next > resource.data.next);
+    }
+
+    function validClient(d) {
+      return d.emri is string && d.emri.size() > 0 && d.emri.size() <= 200
+        && d.kodi is string
+        && d.tipi in ['klient', 'furnitor', 'te_dyja']
+        && d.monedhaPreferuar in ['LEK', 'EUR', 'USD']
+        && d.arkivuar is bool;
+    }
+
+    // Klienti ndryshon gjendjen vetëm me një lëvizje të re kartele (krijohet në të
+    // njëjtin transaction) dhe ndryshimi = shuma e lëvizjes, në monedhën e saj.
+    function ledgerMatches(companyId, clientId) {
+      let id = request.resource.data.lastLedgerId;
+      let e = getAfter(companyPath(companyId, 'ledger', id)).data;
+      let cur = e.monedha;
+      return !exists(companyPath(companyId, 'ledger', id))
+        && e.clientId == clientId
+        && request.resource.data.gjendje.diff(resource.data.gjendje).affectedKeys().hasOnly([cur])
+        && request.resource.data.gjendje.get(cur, 0) == resource.data.gjendje.get(cur, 0) + e.shuma
+        && (
+          request.resource.data.fillestare == resource.data.fillestare
+          || (e.tipi == 'gjendje_fillestare'
+              && request.resource.data.fillestare.diff(resource.data.fillestare).affectedKeys().hasOnly([cur]))
+        );
+    }
+
+    function validLedger(companyId, entryId) {
+      let d = request.resource.data;
+      let before = get(companyPath(companyId, 'clients', d.clientId)).data;
+      let after = getAfter(companyPath(companyId, 'clients', d.clientId)).data;
+      return d.uid == request.auth.uid
+        && d.krijuar == request.time
+        && d.monedha in ['LEK', 'EUR', 'USD']
+        && d.shuma is int && d.shuma != 0
+        && d.kursi is int && d.kursi > 0
+        && d.data is timestamp
+        && after.lastLedgerId == entryId
+        && d.gjendjaPara == before.gjendje.get(d.monedha, 0)
+        && d.gjendjaPas == d.gjendjaPara + d.shuma
+        && (
+          (d.tipi == 'pagese' && d.shuma < 0 && d.metoda in ['arke', 'banke']
+            && hasRole(companyId, ['admin', 'shites', 'finance']))
+          || (d.tipi in ['kthim', 'zbritje'] && d.shuma < 0 && hasRole(companyId, ['admin', 'finance']))
+          || (d.tipi == 'poste' && d.shuma > 0 && hasRole(companyId, ['admin', 'finance']))
+          || (d.tipi == 'rregullim' && d.arsye is string && d.arsye.size() > 0
+            && hasRole(companyId, ['admin', 'finance']))
+          || (d.tipi == 'gjendje_fillestare' && hasRole(companyId, ['admin', 'finance'])
+            && before.fillestare.get(d.monedha, false) == false
+            && after.fillestare.get(d.monedha, false) == true)
+        );
+    }
+
+    function pointsMatch(companyId, clientId) {
+      let id = request.resource.data.lastPointsId;
+      let e = getAfter(companyPath(companyId, 'loyaltyPoints', id)).data;
+      return !exists(companyPath(companyId, 'loyaltyPoints', id))
+        && e.clientId == clientId
+        && request.resource.data.piket == resource.data.piket + e.pike;
+    }
+
+    function validPoints(companyId, entryId) {
+      let d = request.resource.data;
+      let before = get(companyPath(companyId, 'clients', d.clientId)).data;
+      let after = getAfter(companyPath(companyId, 'clients', d.clientId)).data;
+      return d.uid == request.auth.uid
+        && d.krijuar == request.time
+        && d.pike is int && d.pike != 0
+        && d.tipi in ['rregullim', 'gjendje_fillestare']
+        && d.arsye is string && d.arsye.size() > 0
+        && before.rastesor == false
+        && after.lastPointsId == entryId
+        && d.piketPara == before.piket
+        && d.piketPas == before.piket + d.pike
+        && d.piketPas >= 0;
+    }
+
+    function validItem(d) {
+      return d.emri is string && d.emri.size() > 0
+        && d.kodi is string && d.kodi.matches('^[A-Z0-9._-]{1,30}$')
+        && d.cmimi is int && d.cmimi >= 0
+        && d.stokMinimal is int && d.stokMinimal >= 0
+        && !('kosto' in d);
+    }
 
     function validRole(r) { return r in ['admin', 'shites', 'finance', 'magazinier']; }
     function validUserDoc(d) {
@@ -89,11 +181,95 @@ service cloud.firestore {
         allow write: if isAdmin(companyId);
       }
 
-      // Numëruesit e dokumenteve. Në Fazën 3 do të lejohet edhe rritja
-      // brenda transaction-it të lëshimit të faturës.
+      // Numëruesit e dokumenteve. Admini i ndryshon nga Cilësimet; Shitësi
+      // (kodet e klientëve) dhe Magazinieri (kodet e artikujve) vetëm i rrisin.
+      // Në Fazën 3 do të lejohet edhe rritja brenda lëshimit të faturës.
       match /counters/{key} {
         allow read: if isMember(companyId);
-        allow write: if isAdmin(companyId);
+        allow write: if isAdmin(companyId)
+          || (key == 'clients' && hasRole(companyId, ['shites']) && counterIncreases())
+          || (key == 'items' && hasRole(companyId, ['magazinier']) && counterIncreases());
+      }
+
+      // ---------- Klientët ----------
+      // Gjendja (`gjendje`) dhe pikët (`piket`) ndryshojnë VETËM bashkë me një
+      // lëvizje të re në kartelë / pikë, dhe saktësisht me shumën e saj.
+      match /clients/{clientId} {
+        allow read: if hasRole(companyId, ['admin', 'shites', 'finance', 'magazinier']);
+        allow create: if hasRole(companyId, ['admin', 'shites'])
+          && validClient(request.resource.data)
+          && request.resource.data.gjendje == {}
+          && request.resource.data.fillestare == {}
+          && request.resource.data.piket == 0
+          && request.resource.data.arkivuar == false
+          && request.resource.data.rastesor == (clientId == 'klient-rastesor');
+        allow update: if (
+            // (A) të dhënat e profilit / arkivimi
+            hasRole(companyId, ['admin', 'shites'])
+            && !changedKeys().hasAny(['gjendje', 'fillestare', 'piket', 'lastLedgerId', 'lastPointsId', 'kodi', 'rastesor', 'krijuar'])
+            && validClient(request.resource.data)
+            && !(resource.data.rastesor == true && request.resource.data.arkivuar == true)
+          ) || (
+            // (B) lëvizje e re në kartelë
+            hasRole(companyId, ['admin', 'shites', 'finance'])
+            && changedKeys().hasOnly(['gjendje', 'fillestare', 'lastLedgerId'])
+            && ledgerMatches(companyId, clientId)
+          ) || (
+            // (C) lëvizje e re pikësh
+            hasRole(companyId, ['admin', 'finance'])
+            && changedKeys().hasOnly(['piket', 'lastPointsId'])
+            && pointsMatch(companyId, clientId)
+          );
+        allow delete: if false;
+      }
+
+      // Kartela: vetëm shtim. Gabimet korrigjohen me lëvizje të kundërt.
+      match /ledger/{entryId} {
+        allow read: if hasRole(companyId, ['admin', 'shites', 'finance']);
+        allow create: if validLedger(companyId, entryId);
+        allow update, delete: if false;
+      }
+
+      match /loyaltyPoints/{entryId} {
+        allow read: if hasRole(companyId, ['admin', 'shites', 'finance']);
+        allow create: if hasRole(companyId, ['admin', 'finance']) && validPoints(companyId, entryId);
+        allow update, delete: if false;
+      }
+
+      // ---------- Artikujt ----------
+      match /items/{itemId} {
+        allow read: if isMember(companyId);
+        allow create, update: if hasRole(companyId, ['admin', 'magazinier'])
+          && validItem(request.resource.data)
+          && getAfter(companyPath(companyId, 'itemCodes', request.resource.data.kodi)).data.itemId == itemId;
+        allow delete: if false;
+      }
+
+      // Kodi unik i artikullit: një dokument për çdo kod.
+      match /itemCodes/{code} {
+        allow read: if hasRole(companyId, ['admin', 'magazinier']);
+        allow create: if hasRole(companyId, ['admin', 'magazinier'])
+          && getAfter(companyPath(companyId, 'items', request.resource.data.itemId)).data.kodi == code;
+        allow delete: if hasRole(companyId, ['admin', 'magazinier'])
+          && getAfter(companyPath(companyId, 'items', resource.data.itemId)).data.kodi != code;
+        allow update: if false;
+      }
+
+      // Kosto (çmimi i blerjes) – e fshehur nga Shitësi.
+      match /itemCosts/{itemId} {
+        allow read: if hasRole(companyId, ['admin', 'finance', 'magazinier']);
+        allow write: if hasRole(companyId, ['admin', 'magazinier'])
+          && request.resource.data.keys().hasOnly(['kosto'])
+          && (request.resource.data.kosto == null
+              || (request.resource.data.kosto is int && request.resource.data.kosto >= 0));
+      }
+
+      match /preferentialPrices/{priceId} {
+        allow read: if isMember(companyId);
+        allow create, update: if hasRole(companyId, ['admin', 'magazinier'])
+          && priceId == request.resource.data.itemId + '_' + request.resource.data.clientId
+          && request.resource.data.cmimi is int && request.resource.data.cmimi >= 0;
+        allow delete: if hasRole(companyId, ['admin', 'magazinier']);
       }
 
       // Log-u i veprimeve: vetëm shtim, kurrë ndryshim ose fshirje.

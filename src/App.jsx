@@ -10,10 +10,15 @@ import SetupPage from './pages/SetupPage'
 import ProfilePage from './pages/ProfilePage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import SettingsPage from './pages/settings/SettingsPage'
+import ClientsPage from './pages/clients/ClientsPage'
+import ClientProfilePage from './pages/clients/ClientProfilePage'
+import ItemsPage from './pages/items/ItemsPage'
 import { errorMessage } from './services/authService'
 
 const PAGES = {
   cilesimet: SettingsPage,
+  kliente: ClientsPage,
+  artikujt: ItemsPage,
 }
 
 export default function App() {
@@ -69,6 +74,14 @@ export default function App() {
               />
             )
           })}
+          <Route
+            path="/kliente/:id"
+            element={
+              <ProtectedRoute moduleKey="kliente">
+                <ClientProfilePage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/profili" element={<ProfilePage />} />
           <Route path="*" element={<Navigate to={homePathForRole(role)} replace />} />
         </Route>

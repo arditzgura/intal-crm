@@ -28,6 +28,13 @@ React + Vite, HashRouter, Firebase (vetëm Auth email/fjalëkalim + Firestore). 
 - Rolet: `admin`, `shites`, `finance`, `magazinier` → `src/config/roles.js` (UI) dhe `firestore.rules` (server). Mbaji të sinkronizuara.
 - Admini i parë krijohet një herë përmes shënuesit `meta/bootstrap`; rules ndalojnë çdo vetë-ngritje në Admin.
 - Çdo shkrim + hyrja e `auditLog` në të njëjtin batch/transaction (`services/auditService.js`).
+
+## Struktura (Faza 2)
+- Kartela: `ledger` (vetëm shtim, `shuma` me shenjë: + rrit borxhin). `clients.gjendje.{MONEDHA}` përditësohet në të njëjtin transaction dhe vendos `lastLedgerId`; rules verifikojnë ndryshimi = shuma. Njësoj pikët (`loyaltyPoints`, `piket`, `lastPointsId`).
+- Llojet e lëvizjeve dhe lejet: `src/config/ledger.js` ↔ `validLedger` te rules.
+- Kosto e artikullit në `itemCosts/{id}` (jo te `items`), që Shitësi të mos e lexojë. Kodi unik përmes `itemCodes/{KODI}`.
+- Çmime preferenciale: `preferentialPrices/{itemId}_{clientId}`. "Klient Rastësor" = `clients/klient-rastesor`.
+- Rules dhe indekset publikohen me `npx firebase-tools deploy --only firestore` (pyet para çdo deploy-i).
 - Repo në GitHub: `intal-crm` (`base: '/intal-crm/'`). Repo-ja `intal-pro` është sistemi i vjetër – mos e prek.
 
 ## Siguria e repo-s
