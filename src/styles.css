@@ -445,3 +445,10 @@ tr.row-low td { background: #fffbeb; }
 .warn-icon { color: #d97706; margin-left: 4px; vertical-align: -2px; }
 .stock-warn { color: #b45309; display: flex; align-items: center; gap: 4px; }
 .plain-filters { padding: 0; margin-bottom: 10px; }
+
+/* ---------- Faza 5: financa, raporte ---------- */
+.gap-top { margin-top: 12px; }
+.gap-bottom { margin-bottom: 12px; }
+.card-head-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.card-head-row h3 { margin: 0; }
+h3.pad { padding: 14px 14px 0; }

@@ -174,15 +174,17 @@ export const ACTION_LABELS = {
 
 function CancelModal({ inv, actorName, onClose }) {
   const [arsye, setArsye] = useState('')
+  const [pagesa, setPagesa] = useState('teprice')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const refund = inv.paguar > 0 && pagesa === 'kthe'
 
   async function onSubmit(e) {
     e.preventDefault()
     setBusy(true)
     setError('')
     try {
-      await cancelInvoice(inv.id, arsye, actorName)
+      await cancelInvoice(inv.id, arsye, actorName, { kthePagesen: refund })
       onClose()
     } catch (err) {
       setError(err.code ? errorMessage(err) : err.message)
@@ -195,9 +197,22 @@ function CancelModal({ inv, actorName, onClose }) {
       <form onSubmit={onSubmit}>
         <p>
           Fatura nuk fshihet: merr statusin <b>Anuluar</b>. Kartela e klientit dhe stoku kthehen mbrapsht
-          ({formatMoney(-inv.totali + inv.paguar, inv.monedha)} në gjendjen e klientit), dhe statuset e
+          ({formatMoney(-inv.totali + (refund ? inv.paguar : 0), inv.monedha)} në gjendjen e klientit), dhe statuset e
           faturave të tjera rillogariten. Shumat e printuara te faturat e tjera nuk ndryshojnë.
         </p>
+        {inv.paguar > 0 && (
+          <fieldset className="fieldset">
+            <legend>Pagesa prej {formatMoney(inv.paguar, inv.monedha)} te kjo faturë</legend>
+            <label className="check perm-check">
+              <input type="radio" name="pagesa" checked={pagesa === 'teprice'} onChange={() => setPagesa('teprice')} />
+              Paratë mbeten – klienti merr tepricë (përdoret te faturat e ardhshme)
+            </label>
+            <label className="check perm-check">
+              <input type="radio" name="pagesa" checked={pagesa === 'kthe'} onChange={() => setPagesa('kthe')} />
+              Paratë i kthehen klientit – dalin nga {inv.metodaPagese === 'banke' ? 'banka' : 'arka'}
+            </label>
+          </fieldset>
+        )}
         <label className="field">
           <span>Arsyeja e anulimit *</span>
           <textarea rows={3} value={arsye} onChange={(e) => setArsye(e.target.value)} required autoFocus />

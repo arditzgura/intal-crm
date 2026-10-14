@@ -37,6 +37,14 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    label: 'Financa',
+    items: [
+      ['financa_furnitore', 'Paguaj furnitorë'],
+      ['financa_shpenzime', 'Regjistro / anulo shpenzime'],
+      ['financa_arka', 'Lëvizje arke/banke (gjendje fillestare, transfertë, rregullim)'],
+    ],
+  },
+  {
     label: 'Blerje dhe Inventari',
     items: [
       ['blerje_regjistro', 'Regjistro hyrje malli'],
@@ -64,7 +72,7 @@ export const TEMPLATES = {
   },
   finance: {
     label: 'Financë',
-    lejet: ['mod_historiku', 'mod_kliente', 'mod_blerje', 'mod_financa', 'mod_raporte', 'pagese', 'levizje_kartele', 'rregullim_gjendjeje', 'piket', 'sheh_koston', 'blerje_regjistro'],
+    lejet: ['mod_historiku', 'mod_kliente', 'mod_blerje', 'mod_financa', 'mod_raporte', 'pagese', 'levizje_kartele', 'rregullim_gjendjeje', 'piket', 'sheh_koston', 'blerje_regjistro', 'financa_furnitore', 'financa_shpenzime', 'financa_arka'],
   },
   magazinier: {
     label: 'Magazinier',

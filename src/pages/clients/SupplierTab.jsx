@@ -1,4 +1,7 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Wallet } from 'lucide-react'
+import { SupplierPaymentModal } from '../finance/FinanceModals'
 import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
 import { watchSupplierLedger } from '../../services/purchaseService'
@@ -7,13 +10,14 @@ import { formatMoney } from '../../utils/money'
 import { formatDate } from '../../utils/date'
 import { PurchaseList } from '../purchases/PurchasesPage'
 
-const TYPES = { blerje: 'Blerje (hyrje malli)', anulim_blerje: 'Anulim hyrjeje', pagese_furnitori: 'Pagesë furnitorit', rregullim: 'Rregullim' }
+const TYPES = { blerje: 'Blerje (hyrje malli)', anulim_blerje: 'Anulim hyrjeje', pagese_furnitori: 'Pagesë furnitorit', anulim_pagese: 'Anulim pagese', rregullim: 'Rregullim' }
 
 /** Detyrimi ndaj furnitorit (veçmas nga kartela e klientit) dhe hyrjet e tij. */
 export default function SupplierTab({ client }) {
   const { perms } = useAuth()
   const { data: entries, error } = useLive((ok, ko) => watchSupplierLedger(client.id, ok, ko), [client.id], { initial: [] })
   const balances = Object.entries(client.detyrimFurnitori ?? {}).filter(([, v]) => v)
+  const [paying, setPaying] = useState(false)
 
   const run = {}
   const rows = entries.map((e) => {
@@ -24,7 +28,12 @@ export default function SupplierTab({ client }) {
   return (
     <>
       <div className="card">
-        <h3>Detyrimi ndaj furnitorit</h3>
+        <div className="card-head-row">
+          <h3>Detyrimi ndaj furnitorit</h3>
+          {perms.has('financa_furnitore') && (
+            <button className="btn primary" onClick={() => setPaying(true)}><Wallet size={16} /> Paguaj furnitorin</button>
+          )}
+        </div>
         <div className="balance-cards">
           {balances.length ? balances.map(([c, v]) => (
             <div key={c} className={`balance-card ${v > 0 ? 'debt' : 'credit'}`}>
@@ -34,7 +43,7 @@ export default function SupplierTab({ client }) {
             </div>
           )) : <p className="muted">Nuk ka detyrim ndaj këtij furnitori.</p>}
         </div>
-        <p className="muted small">Pagesat ndaj furnitorit regjistrohen te Financa (Faza 5). Ky detyrim nuk ndikon në faturat e klientit.</p>
+        <p className="muted small">Ky detyrim mbahet veçmas dhe nuk ndikon në faturat e klientit. Pagesat dalin nga arka/banka te Financa.</p>
       </div>
 
       <div className="card no-pad">
@@ -58,6 +67,7 @@ export default function SupplierTab({ client }) {
         </div>
       </div>
 
+      {paying && <SupplierPaymentModal supplier={client} onClose={() => setPaying(false)} />}
       {perms.has('mod_blerje') && (
         <>
           <h3>Hyrjet e mallit nga ky furnitor</h3>

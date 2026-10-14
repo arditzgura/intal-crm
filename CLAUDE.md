@@ -45,6 +45,12 @@ React + Vite, HashRouter, Firebase (vetëm Auth email/fjalëkalim + Firestore). 
 - Stoku: burimi = `stockMovements` (vetëm shtim; dalje/kthim_anulim/hyrje/anulim_hyrje/rregullim). `stock/{itemId}.sasia` = kopje me `increment()` në të njëjtin transaction (`services/stockService.writeMovement`, një lëvizje për artikull për dokument). Admini e rindërton me "Rillogarit stokun". Rules nuk e verifikojnë kopjen (limiti 20 akses/transaction).
 - Hyrjet: `purchases` + `purchaseNumbers/{numri}` + `counters/purchases` (`services/purchaseService.js`). Kosto nga hyrja → `itemCosts` + `costHistory` me `burim`.
 - Detyrimi ndaj furnitorit veçmas nga kartela e klientit: `clients.detyrimFurnitori.{MONEDHA}` + `supplierLedger` (`lastSupplierLedgerId`).
+
+## Struktura (Faza 5)
+- Paratë: `cashMovements` (vetëm shtim; arketim/kthim_klientit/pagese_furnitori/shpenzim/anulim/transferte/gjendje_fillestare/rregullim) shkruhen me `services/cashService.writeCash` në të njëjtin transaction me burimin (pagesa e klientit te `ledgerService`/`invoiceService`). `cashBalances/main.{arke|banke}.{MONEDHA}` = kopje me increment.
+- `expenses` dhe `supplierPayments` nuk fshihen: anulohen me arsye (lëvizja e kundërt në arkë). Pagesa e furnitorit ul `detyrimFurnitori` përmes `supplierLedger`.
+- Anulimi i faturës me pagesë: `kthePagesen` → paratë dalin nga arka; përndryshe klienti mbetet me tepricë.
+- Raportet (`pages/reports`) lexojnë `invoiceLines` sipas periudhës; borxhet sipas vjetërsisë ndajnë borxhin aktual nga fatura më e re drejt së vjetrës.
 - Rules dhe indekset publikohen me `npx firebase-tools deploy --only firestore` (pyet para çdo deploy-i).
 - Repo në GitHub: `intal-crm` (`base: '/intal-crm/'`). Repo-ja `intal-pro` është sistemi i vjetër – mos e prek.
 

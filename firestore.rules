@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// INTAL PRO – Firestore Security Rules (Faza 1–4)
+// INTAL PRO – Firestore Security Rules (Faza 1–5)
 // Lejet e roleve zbatohen këtu, jo vetëm në UI. Çdo gjë që nuk lejohet
 // shprehimisht është e ndaluar.
 
@@ -29,7 +29,7 @@ service cloud.firestore {
       return r == 'shites'
         ? ['mod_fature_e_re', 'mod_historiku', 'mod_kliente', 'mod_artikujt', 'mod_inventari', 'fature_leshim', 'kliente_ndrysho', 'pagese']
         : r == 'finance'
-          ? ['mod_historiku', 'mod_kliente', 'mod_blerje', 'mod_financa', 'mod_raporte', 'pagese', 'levizje_kartele', 'rregullim_gjendjeje', 'piket', 'sheh_koston', 'blerje_regjistro']
+          ? ['mod_historiku', 'mod_kliente', 'mod_blerje', 'mod_financa', 'mod_raporte', 'pagese', 'levizje_kartele', 'rregullim_gjendjeje', 'piket', 'sheh_koston', 'blerje_regjistro', 'financa_furnitore', 'financa_shpenzime', 'financa_arka']
           : r == 'magazinier'
             ? ['mod_artikujt', 'mod_blerje', 'mod_inventari', 'artikuj_ndrysho', 'sheh_koston', 'blerje_regjistro', 'inventar_rregullim']
             : [];
@@ -190,6 +190,56 @@ service cloud.firestore {
         && d.krijuarNga.uid == request.auth.uid
         && d.totaliBlerje is int && d.totaliShitje is int
         && d.anuluar == null;
+    }
+
+    function paymentAfter(companyId, id) { return getAfter(companyPath(companyId, 'supplierPayments', id)).data; }
+    function expenseAfter(companyId, id) { return getAfter(companyPath(companyId, 'expenses', id)).data; }
+    function moneyDocOk(d) {
+      return d.krijuar == request.time
+        && d.krijuarNga.uid == request.auth.uid
+        && d.statusi == 'aktiv' && d.anuluar == null
+        && d.llogaria in ['arke', 'banke']
+        && d.monedha in ['LEK', 'EUR', 'USD']
+        && d.shuma is int && d.shuma > 0;
+    }
+    function moneyDocCancel() {
+      return resource.data.statusi == 'aktiv'
+        && request.resource.data.statusi == 'anuluar'
+        && changedKeys().hasOnly(['statusi', 'anuluar'])
+        && request.resource.data.anuluar.arsye is string && request.resource.data.anuluar.arsye.size() > 0
+        && request.resource.data.anuluar.uid == request.auth.uid;
+    }
+    // Lëvizja e parave duhet të ketë burimin e saj të krijuar / anuluar në të njëjtën kërkesë.
+    function validCash(companyId) {
+      let d = request.resource.data;
+      return d.uid == request.auth.uid
+        && d.krijuar == request.time
+        && d.llogaria in ['arke', 'banke']
+        && d.monedha in ['LEK', 'EUR', 'USD']
+        && d.shuma is int && d.shuma != 0
+        && (
+          (d.tipi == 'arketim' && d.shuma > 0
+            && (can(companyId, 'pagese') || can(companyId, 'fature_leshim'))
+            && !exists(companyPath(companyId, 'ledger', d.ledgerId))
+            && ledgerEntry(companyId, d.ledgerId).tipi == 'pagese'
+            && ledgerEntry(companyId, d.ledgerId).shuma == -d.shuma)
+          || (d.tipi == 'kthim_klientit' && d.shuma < 0 && can(companyId, 'anulim_fature')
+            && invoiceAfter(companyId, d.invoiceId).statusi == 'anuluar'
+            && !exists(companyPath(companyId, 'ledger', d.ledgerId))
+            && ledgerEntry(companyId, d.ledgerId).shuma == -d.shuma)
+          || (d.tipi == 'shpenzim' && d.shuma < 0 && can(companyId, 'financa_shpenzime')
+            && expenseAfter(companyId, d.refId).krijuar == request.time
+            && expenseAfter(companyId, d.refId).shuma == -d.shuma)
+          || (d.tipi == 'pagese_furnitori' && d.shuma < 0 && can(companyId, 'financa_furnitore')
+            && paymentAfter(companyId, d.refId).krijuar == request.time
+            && paymentAfter(companyId, d.refId).shuma == -d.shuma)
+          || (d.tipi == 'anulim' && d.shuma > 0 && (
+              (can(companyId, 'financa_shpenzime') && expenseAfter(companyId, d.refId).statusi == 'anuluar'
+                && expenseAfter(companyId, d.refId).shuma == d.shuma)
+              || (can(companyId, 'financa_furnitore') && paymentAfter(companyId, d.refId).statusi == 'anuluar'
+                && paymentAfter(companyId, d.refId).shuma == d.shuma)))
+          || (d.tipi in ['transferte', 'gjendje_fillestare', 'rregullim'] && can(companyId, 'financa_arka'))
+        );
     }
 
     function isDraft(d) { return d.statusi == 'draft' && d.numri == null; }
@@ -501,6 +551,15 @@ service cloud.firestore {
             || (request.resource.data.tipi == 'anulim_blerje' && request.resource.data.shuma < 0
               && can(companyId, 'blerje_anulo')
               && purchaseAfter(companyId, request.resource.data.purchaseId).statusi == 'anuluar')
+            || (request.resource.data.tipi == 'pagese_furnitori' && request.resource.data.shuma < 0
+              && can(companyId, 'financa_furnitore')
+              && paymentAfter(companyId, request.resource.data.paymentId).krijuar == request.time
+              && paymentAfter(companyId, request.resource.data.paymentId).clientId == request.resource.data.clientId
+              && paymentAfter(companyId, request.resource.data.paymentId).shuma == -request.resource.data.shuma)
+            || (request.resource.data.tipi == 'anulim_pagese' && request.resource.data.shuma > 0
+              && can(companyId, 'financa_furnitore')
+              && paymentAfter(companyId, request.resource.data.paymentId).statusi == 'anuluar'
+              && paymentAfter(companyId, request.resource.data.paymentId).shuma == request.resource.data.shuma)
           );
         allow update, delete: if false;
       }
@@ -514,6 +573,37 @@ service cloud.firestore {
                 && purchasedNow(companyId, request.resource.data.burim))
           );
         allow update, delete: if false;
+      }
+
+      // ---------- Financa ----------
+      // Arka / banka: vetëm shtim; çdo lëvizje lidhet me burimin e saj.
+      match /cashMovements/{movementId} {
+        allow read: if canAny(companyId, ['mod_financa', 'mod_raporte']);
+        allow create: if validCash(companyId);
+        allow update, delete: if false;
+      }
+
+      // Kopja e gjendjes së arkës/bankës (increment); Admini e rindërton nga lëvizjet.
+      match /cashBalances/{docId} {
+        allow read: if canAny(companyId, ['mod_financa', 'mod_raporte']);
+        allow write: if canAny(companyId, ['pagese', 'fature_leshim', 'anulim_fature', 'financa_furnitore', 'financa_shpenzime', 'financa_arka'])
+          && request.resource.data.keys().hasOnly(['arke', 'banke', 'rillogaritur']);
+      }
+
+      match /expenses/{expenseId} {
+        allow read: if canAny(companyId, ['mod_financa', 'mod_raporte']);
+        allow create: if can(companyId, 'financa_shpenzime') && moneyDocOk(request.resource.data)
+          && request.resource.data.kategoria is string;
+        allow update: if can(companyId, 'financa_shpenzime') && moneyDocCancel();
+        allow delete: if false;
+      }
+
+      match /supplierPayments/{paymentId} {
+        allow read: if canAny(companyId, ['mod_financa', 'mod_blerje', 'mod_raporte']);
+        allow create: if can(companyId, 'financa_furnitore') && moneyDocOk(request.resource.data)
+          && request.resource.data.clientId is string;
+        allow update: if can(companyId, 'financa_furnitore') && moneyDocCancel();
+        allow delete: if false;
       }
 
       // Log-u i veprimeve: vetëm shtim, kurrë ndryshim ose fshirje.

@@ -4,6 +4,7 @@ import { companyCol, companyDoc, newDocRef } from './paths'
 import { addAudit } from './auditService'
 import { LEDGER_TYPES } from '../config/ledger'
 import { readSettings, readIssued, planLatestChange, applyLatestChange, writePointsEntry, numbersText } from './invoiceChain'
+import { writeCash } from './cashService'
 import { RATE_SCALE } from '../utils/money'
 import { millis } from '../utils/date'
 
@@ -129,6 +130,10 @@ export async function addLedgerEntry({ clientId, tipi, monedha, shuma, data, she
     const para = gjendje[monedha] ?? 0
     const pas = para + signed
     tx.set(entryRef, ledgerEntryData({ clientId, tipi, monedha, kursi, shuma: signed, data, para, shenim, arsye, metoda, faturaId: latest?.id ?? null }, actorName))
+    // Pagesa e klientit hyn në arkë / bankë
+    if (tipi === 'pagese') {
+      writeCash(tx, { llogaria: metoda ?? 'arke', monedha, kursi, shuma: -signed, tipi: 'arketim', data, shenim: `${client.emri}${shenim.trim() ? ` – ${shenim.trim()}` : ''}`, clientId, ledgerId: entryRef.id }, actorName)
+    }
 
     const pts = applyLatestChange(tx, plan, client, settings)
     const pointsPatch = writePointsEntry(

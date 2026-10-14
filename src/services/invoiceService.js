@@ -8,6 +8,7 @@ import { addAudit } from './auditService'
 import { ledgerEntryData } from './ledgerService'
 import { formatDocNumber } from './settingsService'
 import { aggregateByItem, writeMovement } from './stockService'
+import { writeCash } from './cashService'
 import {
   ISSUED, invoiceRef, readSettings, readIssued, readPasuarChain, awardPoints,
   writePointsEntry, numbersText, planLatestChange, applyLatestChange,
@@ -222,10 +223,14 @@ export async function issueInvoice(draftId, data, actorName) {
       tx.set(lref, ledgerEntryData({ clientId: data.clientId, monedha, kursi, data: data.data, para: bal, faturaId: ref.id, ...fields }, actorName))
       bal += fields.shuma
       ledgerIds.push(lref.id)
+      return lref.id
     }
     if (diff) addLedger({ tipi: 'rregullim', shuma: diff, arsye: data.arsyeRregullimi, shenim: `Ndryshim i gjendjes së mëparshme te fatura #${numriTekst}` })
     addLedger({ tipi: 'fature', shuma: totali, shenim: `Fatura #${numriTekst}` })
-    if (paguar > 0) addLedger({ tipi: 'pagese', shuma: -paguar, metoda: data.metodaPagese, shenim: `Paguar te fatura #${numriTekst}` })
+    if (paguar > 0) {
+      const pid = addLedger({ tipi: 'pagese', shuma: -paguar, metoda: data.metodaPagese, shenim: `Paguar te fatura #${numriTekst}` })
+      writeCash(tx, { llogaria: data.metodaPagese, monedha, kursi, shuma: paguar, tipi: 'arketim', data: data.data, shenim: `${client.emri} – fatura #${numriTekst}`, clientId: data.clientId, ledgerId: pid, invoiceId: ref.id }, actorName)
+    }
 
     // Fatura e mëparshme
     if (prev) {
@@ -275,8 +280,10 @@ export async function issueInvoice(draftId, data, actorName) {
  * Anulon një faturë të lëshuar (me arsye). Kartela dhe stoku kthehen mbrapsht;
  * diferenca kalon te fatura që mban borxhin dhe statuset rillogariten.
  * Shumat e printuara te faturat e tjera nuk ndryshojnë.
+ * Nëse fatura kishte pagesë: `kthePagesen` = paratë i kthehen klientit (dalin nga
+ * arka/banka); përndryshe paratë mbeten dhe klienti merr tepricë.
  */
-export async function cancelInvoice(id, arsye, actorName) {
+export async function cancelInvoice(id, arsye, actorName, { kthePagesen = false } = {}) {
   if (!arsye?.trim()) throw new Error('Arsyeja e anulimit është e detyrueshme.')
   const ref = invoiceRef(id)
   const uid = auth.currentUser.uid
@@ -292,7 +299,8 @@ export async function cancelInvoice(id, arsye, actorName) {
     const cSnap = await tx.get(clientRef)
     const client = cSnap.data()
     const settings = await readSettings(tx)
-    const delta = -X.totali + X.paguar // efekti i kundërt në gjendje
+    const refund = kthePagesen && X.paguar > 0
+    const delta = -X.totali + (refund ? X.paguar : 0) // efekti i kundërt në gjendje
     const latestId = client.faturaFundit?.[monedha]
 
     let plan = null
@@ -344,9 +352,13 @@ export async function cancelInvoice(id, arsye, actorName) {
       tx.set(lref, ledgerEntryData({ clientId, monedha, kursi: X.kursi, data: now, para: bal, faturaId: id, tipi: 'anulim', arsye, ...fields }, actorName))
       bal += fields.shuma
       ledgerIds.push(lref.id)
+      return lref.id
     }
     addLedger({ shuma: -X.totali, shenim: `Anulim i faturës #${X.numriTekst ?? X.numri}` })
-    if (X.paguar > 0) addLedger({ shuma: X.paguar, shenim: `Kthim i pagesës së faturës #${X.numriTekst ?? X.numri}` })
+    if (refund) {
+      const lid = addLedger({ shuma: X.paguar, shenim: `Kthim i pagesës së faturës #${X.numriTekst ?? X.numri} (paratë iu kthyen klientit)` })
+      writeCash(tx, { llogaria: X.metodaPagese ?? 'arke', monedha, kursi: X.kursi, shuma: -X.paguar, tipi: 'kthim_klientit', shenim: `${X.klient?.emri ?? ''} – anulim i faturës #${X.numriTekst ?? X.numri}`, clientId, ledgerId: lid, invoiceId: id }, actorName)
+    }
 
     // Pikët: hiqen ato të faturës së anuluar, shtohen ato të faturave që u paguan tani.
     const net = pts.total - (X.piketDhene ?? 0)
@@ -377,7 +389,7 @@ export async function cancelInvoice(id, arsye, actorName) {
       action: 'anulim_fature',
       entity: 'invoices',
       entityId: id,
-      details: { numri: X.numri, klienti: X.klient?.emri, totali: X.totali, paguar: X.paguar, arsye: arsye.trim() },
+      details: { numri: X.numri, klienti: X.klient?.emri, totali: X.totali, paguar: X.paguar, pagesa: X.paguar > 0 ? (refund ? 'u kthye' : 'mbeti tepricë') : null, arsye: arsye.trim() },
       actorName,
     })
   })
