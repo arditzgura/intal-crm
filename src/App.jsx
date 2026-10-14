@@ -10,6 +10,7 @@ import SetupPage from './pages/SetupPage'
 import ProfilePage from './pages/ProfilePage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import SettingsPage from './pages/settings/SettingsPage'
+import { errorMessage } from './services/authService'
 
 const PAGES = {
   cilesimet: SettingsPage,
@@ -38,7 +39,17 @@ export default function App() {
       />
     )
   if (status === 'error')
-    return <StatusScreen title="Gabim" message={error?.message ?? String(error)} showLogout />
+    return (
+      <StatusScreen
+        title="Profili nuk u lexua"
+        message={
+          error?.code === 'permission-denied'
+            ? 'Firestore nuk e lejon leximin e profilit. Kontrolloni që Security Rules (firestore.rules) janë publikuar te Firebase Console → Firestore → Rules.'
+            : errorMessage(error)
+        }
+        showLogout
+      />
+    )
 
   return (
     <SettingsProvider>
