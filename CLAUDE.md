@@ -34,6 +34,12 @@ React + Vite, HashRouter, Firebase (vetëm Auth email/fjalëkalim + Firestore). 
 - Llojet e lëvizjeve dhe lejet: `src/config/ledger.js` ↔ `validLedger` te rules.
 - Kosto e artikullit në `itemCosts/{id}` (jo te `items`), që Shitësi të mos e lexojë. Kodi unik përmes `itemCodes/{KODI}`.
 - Çmime preferenciale: `preferentialPrices/{itemId}_{clientId}`. "Klient Rastësor" = `clients/klient-rastesor`.
+
+## Struktura (Faza 3)
+- Fatura: `invoices` (draft pa numër → lëshim në një transaction te `services/invoiceService.js`). Numri unik: `invoiceNumbers/{numri}` + `counters/invoices`.
+- Zinxhiri: `clients.faturaFundit.{MONEDHA}` = fatura që mban borxhin; `invoices.mbetur` ndryshon me çdo lëvizje kartele; logjika e statuseve dhe pikëve te `services/invoiceChain.js` (përdoret nga lëshimi, pagesat dhe anulimi). Fushat e printuara (gjendjaPara/paguar/gjendjaRe) nuk ndryshojnë kurrë.
+- Klienti mund të marrë 1–3 lëvizje kartele në një transaction (`lastLedgerIds`); rules verifikojnë shumën.
+- `invoiceLines` (statistikat e klientit/artikullit), `stockMovements` (dalje/kthim_anulim), `costHistory` (fitimi me koston në datën e faturës).
 - Rules dhe indekset publikohen me `npx firebase-tools deploy --only firestore` (pyet para çdo deploy-i).
 - Repo në GitHub: `intal-crm` (`base: '/intal-crm/'`). Repo-ja `intal-pro` është sistemi i vjetër – mos e prek.
 
