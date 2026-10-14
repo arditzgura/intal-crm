@@ -3,6 +3,7 @@ import { auth, db } from '../firebase'
 import { companyCol, companyDoc, newDocRef } from './paths'
 import { addAudit } from './auditService'
 import { LEDGER_TYPES } from '../config/ledger'
+import { readSettings, readIssued, planLatestChange, applyLatestChange, writePointsEntry, numbersText } from './invoiceChain'
 import { RATE_SCALE } from '../utils/money'
 import { millis } from '../utils/date'
 
@@ -66,13 +67,40 @@ export function rateFor(monedha, settings) {
 }
 
 /**
- * Shton një lëvizje në kartelë.
+ * Të dhënat e një lëvizjeje kartele (përdoret edhe nga lëshimi / anulimi i faturës).
+ * `shuma` është me shenjë.
+ */
+export function ledgerEntryData({ clientId, tipi, monedha, kursi, shuma, data, para, shenim = '', arsye = '', metoda = null, faturaId = null }, actorName) {
+  return {
+    clientId,
+    tipi,
+    monedha,
+    kursi,
+    shuma,
+    data,
+    shenim: shenim.trim(),
+    arsye: arsye.trim(),
+    metoda: tipi === 'pagese' ? metoda : null,
+    faturaId,
+    gjendjaPara: para,
+    gjendjaPas: para + shuma,
+    uid: auth.currentUser.uid,
+    emri: actorName ?? '',
+    krijuar: serverTimestamp(),
+  }
+}
+
+/**
+ * Shton një lëvizje në kartelë (pa faturë të re). Lëvizja ndikon te fatura më e
+ * fundit e klientit në atë monedhë (ajo që mban borxhin): i ndryshon `mbetur`
+ * dhe statusin; nëse borxhi shlyhet, faturat "Pasuar" kalojnë në "E paguar"
+ * dhe klienti merr pikët.
  * @param shuma  për llojet me shenjë fikse: shuma pozitive (shenja vendoset nga lloji);
  *               për rregullim / gjendje fillestare: shuma me shenjë.
  */
 export async function addLedgerEntry({ clientId, tipi, monedha, shuma, data, shenim = '', arsye = '', metoda = null, kursi }, actorName) {
   const type = LEDGER_TYPES[tipi]
-  if (!type) throw new Error('Lloj lëvizjeje i panjohur.')
+  if (!type || tipi === 'fature' || tipi === 'anulim') throw new Error('Lloj lëvizjeje i panjohur.')
   if (!Number.isInteger(shuma) || shuma === 0) throw new Error('Shuma duhet të jetë e ndryshme nga zero.')
   if (type.sign !== 0 && shuma < 0) throw new Error('Shuma duhet të jetë pozitive.')
   if ((tipi === 'rregullim' || tipi === 'kthim' || tipi === 'zbritje' || tipi === 'poste') && !(arsye || shenim).trim()) {
@@ -84,6 +112,7 @@ export async function addLedgerEntry({ clientId, tipi, monedha, shuma, data, she
   const entryRef = newDocRef('ledger')
 
   await runTransaction(db, async (tx) => {
+    // --- leximet ---
     const snap = await tx.get(clientRef)
     if (!snap.exists()) throw new Error('Klienti nuk ekziston.')
     const client = snap.data()
@@ -92,33 +121,40 @@ export async function addLedgerEntry({ clientId, tipi, monedha, shuma, data, she
     if (tipi === 'gjendje_fillestare' && fillestare[monedha]) {
       throw new Error(`Gjendja fillestare në ${monedha} është vendosur tashmë. Përdorni "Rregullim gjendjeje".`)
     }
+    const settings = await readSettings(tx)
+    const latest = await readIssued(tx, client.faturaFundit?.[monedha])
+    const plan = await planLatestChange(tx, latest, signed)
+
+    // --- shkrimet ---
     const para = gjendje[monedha] ?? 0
     const pas = para + signed
+    tx.set(entryRef, ledgerEntryData({ clientId, tipi, monedha, kursi, shuma: signed, data, para, shenim, arsye, metoda, faturaId: latest?.id ?? null }, actorName))
 
-    tx.set(entryRef, {
-      clientId,
-      tipi,
-      monedha,
-      kursi,
-      shuma: signed,
-      data,
-      shenim: shenim.trim(),
-      arsye: arsye.trim(),
-      metoda: tipi === 'pagese' ? metoda : null,
-      gjendjaPara: para,
-      gjendjaPas: pas,
-      uid: auth.currentUser.uid,
-      emri: actorName ?? '',
-      krijuar: serverTimestamp(),
-    })
-    const update = { [`gjendje.${monedha}`]: pas, lastLedgerId: entryRef.id }
+    const pts = applyLatestChange(tx, plan, client, settings)
+    const pointsPatch = writePointsEntry(
+      tx,
+      { clientId, client, pike: pts.total, tipi: 'fituar', arsye: `Fatura të paguara: ${numbersText(pts.paid.filter((i) => pts.per[i.id]))}`, invoiceIds: Object.keys(pts.per) },
+      actorName,
+    )
+
+    const update = { [`gjendje.${monedha}`]: pas, lastLedgerIds: [entryRef.id], ...pointsPatch }
     if (tipi === 'gjendje_fillestare') update[`fillestare.${monedha}`] = true
     tx.update(clientRef, update)
     addAudit(tx, {
       action: `kartela_${tipi}`,
       entity: 'ledger',
       entityId: entryRef.id,
-      details: { clientId, kodi: client.kodi, monedha, shuma: signed, gjendjaPara: para, gjendjaPas: pas, arsye: arsye.trim(), shenim: shenim.trim() },
+      details: {
+        clientId,
+        kodi: client.kodi,
+        monedha,
+        shuma: signed,
+        gjendjaPara: para,
+        gjendjaPas: pas,
+        arsye: arsye.trim(),
+        shenim: shenim.trim(),
+        ...(plan ? { fatura: latest.data.numri, statusiFatures: plan.statusi } : {}),
+      },
       actorName,
     })
   })

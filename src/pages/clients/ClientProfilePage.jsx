@@ -8,7 +8,6 @@ import { watchClientLedger } from '../../services/ledgerService'
 import { errorMessage } from '../../services/authService'
 import { CLIENT_TYPES, canEditClients, canLedger, canAdjustPoints, OTHER_MOVEMENTS } from '../../config/ledger'
 import { CURRENCIES, formatMoney } from '../../utils/money'
-import { canSeeCost } from '../../config/roles'
 import { formatDate, millis } from '../../utils/date'
 import Balance from '../../components/Balance'
 import ClientFormModal from './ClientFormModal'
@@ -18,6 +17,8 @@ import LedgerTab from './LedgerTab'
 import PaymentsTab from './PaymentsTab'
 import PointsTab from './PointsTab'
 import ClientPricesTab from './ClientPricesTab'
+import { InvoiceList } from '../invoices/HistoryPage'
+import ClientPurchases from './ClientPurchases'
 
 const TABS = [
   ['kartela', 'Kartela'],
@@ -137,21 +138,8 @@ export default function ClientProfilePage() {
       {ledgerError && <div className="alert error">{errorMessage(ledgerError)}</div>}
       {tab === 'kartela' && <LedgerTab client={client} ledger={ledger} />}
       {tab === 'pagesat' && <PaymentsTab ledger={payments} />}
-      {tab === 'faturat' && (
-        <div className="card center placeholder">
-          <h3>Faturat</h3>
-          <p className="muted">Faturat e klientit shfaqen këtu nga Faza 3.</p>
-        </div>
-      )}
-      {tab === 'blerjet' && (
-        <div className="card center placeholder">
-          <h3>Artikujt e blerë</h3>
-          <p className="muted">
-            Nga Faza 3: çdo artikull që ka blerë klienti, me sasinë, çmimin mesatar, totalin
-            {canSeeCost(perms) ? ' dhe fitimin' : ''}, si dhe blerjet totale sipas periudhës.
-          </p>
-        </div>
-      )}
+      {tab === 'faturat' && <InvoiceList fixedClientId={client.id} />}
+      {tab === 'blerjet' && <ClientPurchases client={client} />}
       {tab === 'piket' && (
         <PointsTab
           client={client}

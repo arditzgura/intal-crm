@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// INTAL PRO – Firestore Security Rules (Faza 1–2)
+// INTAL PRO – Firestore Security Rules (Faza 1–3)
 // Lejet e roleve zbatohen këtu, jo vetëm në UI. Çdo gjë që nuk lejohet
 // shprehimisht është e ndaluar.
 
@@ -27,7 +27,7 @@ service cloud.firestore {
     // src/config/permissions.js (TEMPLATES). Mbaji të sinkronizuara.
     function roleDefaults(r) {
       return r == 'shites'
-        ? ['mod_fature_e_re', 'mod_historiku', 'mod_kliente', 'mod_artikujt', 'mod_inventari', 'kliente_ndrysho', 'pagese']
+        ? ['mod_fature_e_re', 'mod_historiku', 'mod_kliente', 'mod_artikujt', 'mod_inventari', 'fature_leshim', 'kliente_ndrysho', 'pagese']
         : r == 'finance'
           ? ['mod_historiku', 'mod_kliente', 'mod_blerje', 'mod_financa', 'mod_raporte', 'pagese', 'levizje_kartele', 'rregullim_gjendjeje', 'piket', 'sheh_koston']
           : r == 'magazinier'
@@ -59,21 +59,49 @@ service cloud.firestore {
         && d.arkivuar is bool;
     }
 
-    // Klienti ndryshon gjendjen vetëm me një lëvizje të re kartele (krijohet në të
-    // njëjtin transaction) dhe ndryshimi = shuma e lëvizjes, në monedhën e saj.
-    function ledgerMatches(companyId, clientId) {
-      let id = request.resource.data.lastLedgerId;
-      let e = getAfter(companyPath(companyId, 'ledger', id)).data;
-      let cur = e.monedha;
+    // Klienti ndryshon gjendjen vetëm me 1–3 lëvizje të reja kartele (krijohen në të
+    // njëjtin transaction, `lastLedgerIds`) dhe ndryshimi = shuma e tyre, në një monedhë.
+    // `faturaFundit` (fatura që mban borxhin) ndryshon vetëm bashkë me to.
+    function ledgerEntry(companyId, id) { return getAfter(companyPath(companyId, 'ledger', id)).data; }
+    function isNewEntry(companyId, id, clientId, cur) {
       return !exists(companyPath(companyId, 'ledger', id))
-        && e.clientId == clientId
+        && ledgerEntry(companyId, id).clientId == clientId
+        && ledgerEntry(companyId, id).monedha == cur;
+    }
+    function ledgerSum(companyId, ids) {
+      return ids.size() == 1 ? ledgerEntry(companyId, ids[0]).shuma
+        : ids.size() == 2 ? ledgerEntry(companyId, ids[0]).shuma + ledgerEntry(companyId, ids[1]).shuma
+        : ledgerEntry(companyId, ids[0]).shuma + ledgerEntry(companyId, ids[1]).shuma + ledgerEntry(companyId, ids[2]).shuma;
+    }
+    function ledgerMatches(companyId, clientId) {
+      let ids = request.resource.data.lastLedgerIds;
+      let first = ledgerEntry(companyId, ids[0]);
+      let cur = first.monedha;
+      let ff = request.resource.data.get('faturaFundit', {});
+      let ffOld = resource.data.get('faturaFundit', {});
+      return ids is list && ids.size() >= 1 && ids.size() <= 3
+        && isNewEntry(companyId, ids[0], clientId, cur)
+        && (ids.size() < 2 || isNewEntry(companyId, ids[1], clientId, cur))
+        && (ids.size() < 3 || isNewEntry(companyId, ids[2], clientId, cur))
         && request.resource.data.gjendje.diff(resource.data.gjendje).affectedKeys().hasOnly([cur])
-        && request.resource.data.gjendje.get(cur, 0) == resource.data.gjendje.get(cur, 0) + e.shuma
+        && request.resource.data.gjendje.get(cur, 0) == resource.data.gjendje.get(cur, 0) + ledgerSum(companyId, ids)
         && (
-          request.resource.data.fillestare == resource.data.fillestare
-          || (e.tipi == 'gjendje_fillestare'
+          request.resource.data.get('fillestare', {}) == resource.data.get('fillestare', {})
+          || (first.tipi == 'gjendje_fillestare'
               && request.resource.data.fillestare.diff(resource.data.fillestare).affectedKeys().hasOnly([cur]))
+        )
+        && (
+          ff == ffOld
+          || (ff.diff(ffOld).affectedKeys().hasOnly([cur])
+              && (ff.get(cur, null) == null
+                  || getAfter(companyPath(companyId, 'invoices', ff[cur])).data.clientId == clientId))
         );
+    }
+
+    function invoiceAfter(companyId, id) { return getAfter(companyPath(companyId, 'invoices', id)).data; }
+    // Fatura u lëshua në këtë kërkesë (transaction-i i lëshimit).
+    function issuedNow(companyId, id) {
+      return id is string && invoiceAfter(companyId, id).leshuar == request.time;
     }
 
     function validLedger(companyId, entryId) {
@@ -86,11 +114,11 @@ service cloud.firestore {
         && d.shuma is int && d.shuma != 0
         && d.kursi is int && d.kursi > 0
         && d.data is timestamp
-        && after.lastLedgerId == entryId
-        && d.gjendjaPara == before.gjendje.get(d.monedha, 0)
+        && entryId in after.lastLedgerIds
         && d.gjendjaPas == d.gjendjaPara + d.shuma
         && (
-          (d.tipi == 'pagese' && d.shuma < 0 && d.metoda in ['arke', 'banke'] && can(companyId, 'pagese'))
+          (d.tipi == 'pagese' && d.shuma < 0 && d.metoda in ['arke', 'banke']
+            && (can(companyId, 'pagese') || (can(companyId, 'fature_leshim') && issuedNow(companyId, d.faturaId))))
           || (d.tipi in ['kthim', 'zbritje'] && d.shuma < 0 && can(companyId, 'levizje_kartele'))
           || (d.tipi == 'poste' && d.shuma > 0 && can(companyId, 'levizje_kartele'))
           || (d.tipi == 'rregullim' && d.arsye is string && d.arsye.size() > 0
@@ -98,6 +126,13 @@ service cloud.firestore {
           || (d.tipi == 'gjendje_fillestare' && can(companyId, 'rregullim_gjendjeje')
             && before.fillestare.get(d.monedha, false) == false
             && after.fillestare.get(d.monedha, false) == true)
+          || (d.tipi == 'fature' && d.shuma > 0 && can(companyId, 'fature_leshim')
+            && issuedNow(companyId, d.faturaId)
+            && invoiceAfter(companyId, d.faturaId).clientId == d.clientId
+            && invoiceAfter(companyId, d.faturaId).totali == d.shuma)
+          || (d.tipi == 'anulim' && can(companyId, 'anulim_fature')
+            && invoiceAfter(companyId, d.faturaId).statusi == 'anuluar'
+            && invoiceAfter(companyId, d.faturaId).clientId == d.clientId)
         );
     }
 
@@ -116,13 +151,34 @@ service cloud.firestore {
       return d.uid == request.auth.uid
         && d.krijuar == request.time
         && d.pike is int && d.pike != 0
-        && d.tipi in ['rregullim', 'gjendje_fillestare']
-        && d.arsye is string && d.arsye.size() > 0
         && before.rastesor == false
         && after.lastPointsId == entryId
         && d.piketPara == before.piket
         && d.piketPas == before.piket + d.pike
-        && d.piketPas >= 0;
+        && d.piketPas >= 0
+        && (
+          (d.tipi in ['rregullim', 'gjendje_fillestare'] && can(companyId, 'piket')
+            && d.arsye is string && d.arsye.size() > 0)
+          || (d.tipi == 'fituar' && d.pike > 0 && d.invoiceIds is list)
+          || (d.tipi == 'anulim_fature' && d.pike < 0 && can(companyId, 'anulim_fature'))
+        );
+    }
+
+    function isDraft(d) { return d.statusi == 'draft' && d.numri == null; }
+    function issuedOk(companyId, invoiceId) {
+      let d = request.resource.data;
+      let numPath = companyPath(companyId, 'invoiceNumbers', string(d.numri));
+      return d.numri is int && d.numri > 0
+        && !exists(numPath)
+        && getAfter(numPath).data.invoiceId == invoiceId
+        && d.totali is int && d.paguar is int && d.paguar >= 0
+        && d.gjendjaPara is int
+        && d.gjendjaRe == d.gjendjaPara + d.totali - d.paguar
+        && d.mbetur == d.gjendjaRe
+        && d.statusi == (d.gjendjaRe <= 0 ? 'e_paguar' : 'pa_paguar')
+        && d.leshuar == request.time
+        && d.leshuarNga.uid == request.auth.uid
+        && d.anuluar == null;
     }
 
     function validItem(d) {
@@ -208,7 +264,8 @@ service cloud.firestore {
         allow read: if isMember(companyId);
         allow write: if isAdmin(companyId)
           || (key == 'clients' && can(companyId, 'kliente_ndrysho') && counterIncreases())
-          || (key == 'items' && can(companyId, 'artikuj_ndrysho') && counterIncreases());
+          || (key == 'items' && can(companyId, 'artikuj_ndrysho') && counterIncreases())
+          || (key == 'invoices' && can(companyId, 'fature_leshim') && counterIncreases());
       }
 
       // ---------- Klientët ----------
@@ -226,14 +283,17 @@ service cloud.firestore {
         allow update: if (
             // (A) të dhënat e profilit / arkivimi
             can(companyId, 'kliente_ndrysho')
-            && !changedKeys().hasAny(['gjendje', 'fillestare', 'piket', 'lastLedgerId', 'lastPointsId', 'kodi', 'rastesor', 'krijuar'])
+            && !changedKeys().hasAny(['gjendje', 'fillestare', 'piket', 'lastLedgerId', 'lastLedgerIds', 'lastPointsId', 'faturaFundit', 'kodi', 'rastesor', 'krijuar'])
             && validClient(request.resource.data)
             && !(resource.data.rastesor == true && request.resource.data.arkivuar == true)
           ) || (
-            // (B) lëvizje e re në kartelë (leja kontrollohet te validLedger)
+            // (B) lëvizje të reja në kartelë (leja kontrollohet te validLedger), me
+            //     faturën që mban borxhin dhe pikët e fituara në të njëjtin transaction
             isMember(companyId)
-            && changedKeys().hasOnly(['gjendje', 'fillestare', 'lastLedgerId'])
+            && changedKeys().hasOnly(['gjendje', 'fillestare', 'lastLedgerIds', 'faturaFundit', 'piket', 'lastPointsId'])
+            && changedKeys().hasAny(['lastLedgerIds'])
             && ledgerMatches(companyId, clientId)
+            && (!changedKeys().hasAny(['piket', 'lastPointsId']) || pointsMatch(companyId, clientId))
           ) || (
             // (C) lëvizje e re pikësh
             can(companyId, 'piket')
@@ -252,7 +312,7 @@ service cloud.firestore {
 
       match /loyaltyPoints/{entryId} {
         allow read: if can(companyId, 'mod_kliente');
-        allow create: if can(companyId, 'piket') && validPoints(companyId, entryId);
+        allow create: if isMember(companyId) && validPoints(companyId, entryId);
         allow update, delete: if false;
       }
 
@@ -292,9 +352,72 @@ service cloud.firestore {
         allow delete: if can(companyId, 'artikuj_ndrysho');
       }
 
+      // ---------- Faturat ----------
+      // Drafti ndryshohet / fshihet lirisht. Fatura e lëshuar nuk ndryshohet: lejohen
+      // vetëm fushat e zinxhirit (statusi, mbetur, faturaPas, piketDhene) dhe anulimi.
+      match /invoices/{invoiceId} {
+        allow read: if canAny(companyId, ['mod_historiku', 'mod_fature_e_re', 'mod_kliente', 'mod_raporte', 'mod_financa', 'mod_shitjet']);
+        allow create: if can(companyId, 'fature_leshim')
+          && (isDraft(request.resource.data) || issuedOk(companyId, invoiceId));
+        allow update: if (
+            resource.data.statusi == 'draft' && can(companyId, 'fature_leshim')
+            && (isDraft(request.resource.data) || issuedOk(companyId, invoiceId))
+          ) || (
+            resource.data.statusi in ['pa_paguar', 'pasuar', 'e_paguar'] && isMember(companyId)
+            && changedKeys().hasOnly(['statusi', 'mbetur', 'faturaPas', 'piketDhene'])
+            && request.resource.data.statusi in ['pa_paguar', 'pasuar', 'e_paguar']
+          ) || (
+            resource.data.statusi in ['pa_paguar', 'pasuar', 'e_paguar'] && can(companyId, 'anulim_fature')
+            && request.resource.data.statusi == 'anuluar'
+            && changedKeys().hasOnly(['statusi', 'anuluar', 'piketDhene'])
+            && request.resource.data.anuluar.arsye is string && request.resource.data.anuluar.arsye.size() > 0
+            && request.resource.data.anuluar.uid == request.auth.uid
+          );
+        allow delete: if resource.data.statusi == 'draft' && can(companyId, 'fature_leshim');
+      }
+
+      // Një dokument për çdo numër fature: krijohet vetëm një herë → numra unikë.
+      match /invoiceNumbers/{n} {
+        allow read: if can(companyId, 'fature_leshim');
+        allow create: if can(companyId, 'fature_leshim')
+          && invoiceAfter(companyId, request.resource.data.invoiceId).numri == int(n);
+        allow update, delete: if false;
+      }
+
+      match /invoiceLines/{lineId} {
+        allow read: if canAny(companyId, ['mod_kliente', 'mod_artikujt', 'mod_raporte', 'mod_historiku', 'mod_shitjet']);
+        allow create: if can(companyId, 'fature_leshim')
+          && issuedNow(companyId, request.resource.data.invoiceId)
+          && request.resource.data.anuluar == false;
+        allow update: if can(companyId, 'anulim_fature')
+          && changedKeys().hasOnly(['anuluar']) && request.resource.data.anuluar == true;
+        allow delete: if false;
+      }
+
+      // Lëvizjet e stokut: vetëm shtim (Faza 3: daljet nga faturat dhe kthimet nga anulimi).
+      match /stockMovements/{movementId} {
+        allow read: if canAny(companyId, ['mod_inventari', 'mod_artikujt', 'mod_blerje', 'mod_raporte']);
+        allow create: if request.resource.data.uid == request.auth.uid && (
+            (request.resource.data.tipi == 'dalje' && can(companyId, 'fature_leshim')
+              && issuedNow(companyId, request.resource.data.invoiceId))
+            || (request.resource.data.tipi == 'kthim_anulim' && can(companyId, 'anulim_fature')
+              && invoiceAfter(companyId, request.resource.data.invoiceId).statusi == 'anuluar')
+          );
+        allow update, delete: if false;
+      }
+
+      // Historiku i kostos (fitimi me koston në datën e faturës).
+      match /costHistory/{entryId} {
+        allow read: if can(companyId, 'sheh_koston');
+        allow create: if can(companyId, 'artikuj_ndrysho') && can(companyId, 'sheh_koston')
+          && request.resource.data.kosto is int && request.resource.data.nga == request.time;
+        allow update, delete: if false;
+      }
+
       // Log-u i veprimeve: vetëm shtim, kurrë ndryshim ose fshirje.
       match /auditLog/{entryId} {
-        allow read: if isAdmin(companyId);
+        allow read: if can(companyId, 'sheh_logun')
+          || (can(companyId, 'mod_historiku') && resource.data.entity == 'invoices');
         allow create: if isMember(companyId)
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.koha == request.time;

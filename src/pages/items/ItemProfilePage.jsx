@@ -11,6 +11,7 @@ import { formatMoney } from '../../utils/money'
 import { formatDate } from '../../utils/date'
 import ItemFormModal from './ItemFormModal'
 import ItemPricesSection from './ItemPricesSection'
+import ItemSales from './ItemSales'
 
 const TABS = [
   ['detajet', 'Detajet'],
@@ -118,12 +119,7 @@ export default function ItemProfilePage() {
           <ItemPricesSection item={item} readOnly={!editable} />
         </>
       )}
-      {tab === 'shitjet' && (
-        <Placeholder
-          title="Shitjet e artikullit"
-          text={`Nga Faza 3: kush e ka blerë, sasia, çmimi, totali${showCost ? ' dhe fitimi' : ''}, me totale sipas periudhës.`}
-        />
-      )}
+      {tab === 'shitjet' && <ItemSales item={item} />}
       {tab === 'stoku' && (
         <Placeholder title="Lëvizjet e stokut" text="Nga Faza 4: hyrjet, daljet dhe rregullimet e inventarit për këtë artikull." />
       )}

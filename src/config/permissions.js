@@ -19,6 +19,14 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    label: 'Faturat',
+    items: [
+      ['fature_leshim', 'Krijo drafte dhe lësho fatura'],
+      ['anulim_fature', 'Anulo fatura (me arsye)'],
+      ['sheh_logun', 'Sheh log-un e të gjitha veprimeve'],
+    ],
+  },
+  {
     label: 'Klientë',
     items: [
       ['kliente_ndrysho', 'Krijo / ndrysho klientë'],
@@ -44,7 +52,7 @@ export const PERMISSION_LABELS = Object.fromEntries(PERMISSION_GROUPS.flatMap((g
 export const TEMPLATES = {
   shites: {
     label: 'Shitës',
-    lejet: ['mod_fature_e_re', 'mod_historiku', 'mod_kliente', 'mod_artikujt', 'mod_inventari', 'kliente_ndrysho', 'pagese'],
+    lejet: ['mod_fature_e_re', 'mod_historiku', 'mod_kliente', 'mod_artikujt', 'mod_inventari', 'fature_leshim', 'kliente_ndrysho', 'pagese'],
   },
   finance: {
     label: 'Financë',

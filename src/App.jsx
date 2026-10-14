@@ -14,12 +14,17 @@ import ClientsPage from './pages/clients/ClientsPage'
 import ClientProfilePage from './pages/clients/ClientProfilePage'
 import ItemsPage from './pages/items/ItemsPage'
 import ItemProfilePage from './pages/items/ItemProfilePage'
+import NewInvoicePage from './pages/invoices/NewInvoicePage'
+import HistoryPage from './pages/invoices/HistoryPage'
+import InvoiceViewPage from './pages/invoices/InvoiceViewPage'
 import { errorMessage } from './services/authService'
 
 const PAGES = {
   cilesimet: SettingsPage,
   kliente: ClientsPage,
   artikujt: ItemsPage,
+  'fature-e-re': NewInvoicePage,
+  historiku: HistoryPage,
 }
 
 export default function App() {
@@ -88,6 +93,14 @@ export default function App() {
             element={
               <ProtectedRoute moduleKey="artikujt">
                 <ItemProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fatura/:id"
+            element={
+              <ProtectedRoute moduleKey={['historiku', 'fature-e-re', 'kliente']}>
+                <InvoiceViewPage />
               </ProtectedRoute>
             }
           />

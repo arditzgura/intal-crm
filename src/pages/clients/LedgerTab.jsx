@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Printer, Download } from 'lucide-react'
 import { useSettings } from '../../hooks/useSettings'
 import { buildStatement } from '../../services/ledgerService'
@@ -101,7 +102,8 @@ export default function LedgerTab({ client, ledger }) {
                 <td>{formatDate(e.data)}</td>
                 <td>{describe(e)}</td>
                 <td className="wrap">
-                  {e.shenim || e.arsye}
+                  {e.faturaId && (e.tipi === 'fature' || e.tipi === 'anulim') ? <Link to={`/fatura/${e.faturaId}`}>{e.shenim}</Link> : e.shenim || e.arsye}
+                  {e.tipi === 'anulim' && e.arsye && <span className="muted small"> – {e.arsye}</span>}
                   {e.emri && <span className="muted small no-print"> · {e.emri}</span>}
                 </td>
                 <td className="num">{e.shuma > 0 ? formatMoney(e.shuma) : ''}</td>

@@ -10,6 +10,7 @@ export const LEDGER_TYPES = {
   zbritje: { label: 'Zbritje', sign: -1, perm: 'levizje_kartele' },
   poste: { label: 'Postë / transport', sign: 1, perm: 'levizje_kartele' },
   rregullim: { label: 'Rregullim manual i gjendjes', sign: 0, perm: 'rregullim_gjendjeje' },
+  anulim: { label: 'Anulim fature', sign: 0, perm: null }, // krijohet vetëm nga anulimi i faturës
 }
 
 // Lëvizjet që zgjidhen te "Lëvizje tjetër"
@@ -24,6 +25,7 @@ export const POINT_TYPES = {
   fituar: 'Fituar',
   perdorur: 'Përdorur',
   rregullim: 'Rregullim me dorë',
+  anulim_fature: 'Anulim fature',
 }
 
 // `perms` = Set-i i lejeve nga useAuth()

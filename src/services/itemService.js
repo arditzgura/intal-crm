@@ -115,7 +115,10 @@ export async function createItem(data, kosto, { autoCode }, actorName) {
     if (nextCounter) tx.set(counterRef, { next: nextCounter }, { merge: true })
     tx.set(companyDoc('itemCodes', key), { itemId: ref.id })
     tx.set(ref, { ...fields, kodi: key, arkivuar: false, krijuar: serverTimestamp() })
-    if (kosto != null) tx.set(companyDoc('itemCosts', ref.id), { kosto })
+    if (kosto != null) {
+      tx.set(companyDoc('itemCosts', ref.id), { kosto })
+      tx.set(newDocRef('costHistory'), { itemId: ref.id, kosto, nga: serverTimestamp() })
+    }
     addAudit(tx, { action: 'krijim_artikulli', entity: 'items', entityId: ref.id, details: { kodi: key, ...fields, kosto: kosto ?? null }, actorName })
     return key
   })
@@ -139,7 +142,10 @@ export async function updateItem(id, data, kosto, actorName) {
       tx.set(companyDoc('itemCodes', newKey), { itemId: id })
     }
     tx.update(ref, { ...fields, kodi: newKey })
-    if (kosto !== undefined) tx.set(companyDoc('itemCosts', id), { kosto })
+    if (kosto !== undefined) {
+      tx.set(companyDoc('itemCosts', id), { kosto })
+      if (kosto != null) tx.set(newDocRef('costHistory'), { itemId: id, kosto, nga: serverTimestamp() })
+    }
     addAudit(tx, {
       action: 'ndryshim_artikulli',
       entity: 'items',
@@ -160,6 +166,43 @@ export async function setItemArchived(id, arkivuar, actorName) {
   batch.update(companyDoc('items', id), { arkivuar })
   addAudit(batch, { action: arkivuar ? 'arkivim_artikulli' : 'riaktivizim_artikulli', entity: 'items', entityId: id, actorName })
   await batch.commit()
+}
+
+// ---------- Historiku i kostos ----------
+
+/**
+ * Historiku i kostos (costHistory: { itemId, kosto, nga }). Fitimi i një shitjeje
+ * llogaritet me koston që kishte artikulli në datën e faturës.
+ * Kthen { itemId: [{ kosto, nga(ms) }, ...] } të renditura sipas datës.
+ */
+export function watchCostHistory(onData, onError) {
+  return onSnapshot(
+    companyCol('costHistory'),
+    (snap) => {
+      const out = {}
+      for (const d of snap.docs) {
+        const { itemId, kosto, nga } = d.data()
+        ;(out[itemId] ??= []).push({ kosto, nga: nga?.toMillis?.() ?? 0 })
+      }
+      for (const list of Object.values(out)) list.sort((a, b) => a.nga - b.nga)
+      onData(out)
+    },
+    onError,
+  )
+}
+
+/** Kosto e artikullit në një datë: hyrja e fundit para datës, përndryshe e para e njohur ose kosto aktuale. */
+export function costAt(itemId, dateMs, history, currentCosts) {
+  const list = history[itemId]
+  if (list?.length) {
+    let found = null
+    for (const h of list) {
+      if (h.nga <= dateMs) found = h
+      else break
+    }
+    return (found ?? list[0]).kosto
+  }
+  return currentCosts[itemId] ?? null
 }
 
 // ---------- Çmimet preferenciale ----------
