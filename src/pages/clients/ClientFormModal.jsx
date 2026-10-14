@@ -20,14 +20,14 @@ const TEXT_FIELDS = [
 
 /** Krijim / ndryshim klienti. Te krijimi, Admin/Financë mund të vendosin edhe gjendjen fillestare. */
 export default function ClientFormModal({ client, onClose, onSaved }) {
-  const { role, profile } = useAuth()
+  const { perms, profile } = useAuth()
   const { settings } = useSettings()
   const [form, setForm] = useState(() => ({ ...EMPTY_CLIENT, ...(client ?? {}) }))
   const [initial, setInitial] = useState({ shuma: '', monedha: 'LEK', data: toInputDate() })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const isNew = !client
-  const canInitial = isNew && canLedger(role, 'gjendje_fillestare')
+  const canInitial = isNew && canLedger(perms, 'gjendje_fillestare')
   const set = (patch) => setForm((f) => ({ ...f, ...patch }))
 
   async function onSubmit(e) {

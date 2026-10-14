@@ -1,7 +1,8 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth, COMPANY_ID } from '../firebase'
 import { watchUserProfile, isBootstrapped } from '../services/userService'
+import { permissionsOf } from '../config/permissions'
 
 const AuthContext = createContext(null)
 
@@ -71,9 +72,10 @@ export function AuthProvider({ children }) {
   }, [user, reloadKey])
 
   const reload = useCallback(() => setReloadKey((k) => k + 1), [])
+  const perms = useMemo(() => permissionsOf(profile), [profile])
 
   return (
-    <AuthContext.Provider value={{ user, profile, status, error, reload, role: profile?.roli }}>
+    <AuthContext.Provider value={{ user, profile, status, error, reload, role: profile?.roli, perms }}>
       {children}
     </AuthContext.Provider>
   )

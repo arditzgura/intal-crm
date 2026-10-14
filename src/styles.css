@@ -302,3 +302,9 @@ fieldset.plain { border: none; padding: 0; margin: 0; min-width: 0; }
   .table th, .table td { padding: 5px 6px; font-size: 11px; }
   .bal-debt, .bal-credit { color: #000; }
 }
+
+/* Lejet e përdoruesit */
+.perm-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0 12px; }
+.perm-check { display: flex; color: var(--text); padding: 3px 0; white-space: normal; align-items: flex-start; }
+.perm-check input { margin-top: 3px; }
+.alert:not(.error):not(.success) { background: #eff6ff; color: #1e3a8a; border: 1px solid #bfdbfe; }

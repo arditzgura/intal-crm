@@ -22,6 +22,26 @@ service cloud.firestore {
     function hasRole(companyId, roles) { return isMember(companyId) && me().roli in roles; }
     function isAdmin(companyId) { return hasRole(companyId, ['admin']); }
 
+    // Lejet për çdo përdorues (users/{uid}.lejet). Admini i ka të gjitha.
+    // Përdoruesit pa `lejet` marrin shabllonin e rolit – njësoj si
+    // src/config/permissions.js (TEMPLATES). Mbaji të sinkronizuara.
+    function roleDefaults(r) {
+      return r == 'shites'
+        ? ['mod_fature_e_re', 'mod_historiku', 'mod_kliente', 'mod_artikujt', 'mod_inventari', 'kliente_ndrysho', 'pagese']
+        : r == 'finance'
+          ? ['mod_historiku', 'mod_kliente', 'mod_blerje', 'mod_financa', 'mod_raporte', 'pagese', 'levizje_kartele', 'rregullim_gjendjeje', 'piket', 'sheh_koston']
+          : r == 'magazinier'
+            ? ['mod_artikujt', 'mod_blerje', 'mod_inventari', 'artikuj_ndrysho', 'sheh_koston']
+            : [];
+    }
+    function myPerms() { return me().get('lejet', roleDefaults(me().roli)); }
+    function can(companyId, perm) {
+      return isMember(companyId) && (me().roli == 'admin' || perm in myPerms());
+    }
+    function canAny(companyId, perms) {
+      return isMember(companyId) && (me().roli == 'admin' || myPerms().hasAny(perms));
+    }
+
     function companyPath(companyId, col, id) {
       return /databases/$(database)/documents/companies/$(companyId)/$(col)/$(id);
     }
@@ -70,13 +90,12 @@ service cloud.firestore {
         && d.gjendjaPara == before.gjendje.get(d.monedha, 0)
         && d.gjendjaPas == d.gjendjaPara + d.shuma
         && (
-          (d.tipi == 'pagese' && d.shuma < 0 && d.metoda in ['arke', 'banke']
-            && hasRole(companyId, ['admin', 'shites', 'finance']))
-          || (d.tipi in ['kthim', 'zbritje'] && d.shuma < 0 && hasRole(companyId, ['admin', 'finance']))
-          || (d.tipi == 'poste' && d.shuma > 0 && hasRole(companyId, ['admin', 'finance']))
+          (d.tipi == 'pagese' && d.shuma < 0 && d.metoda in ['arke', 'banke'] && can(companyId, 'pagese'))
+          || (d.tipi in ['kthim', 'zbritje'] && d.shuma < 0 && can(companyId, 'levizje_kartele'))
+          || (d.tipi == 'poste' && d.shuma > 0 && can(companyId, 'levizje_kartele'))
           || (d.tipi == 'rregullim' && d.arsye is string && d.arsye.size() > 0
-            && hasRole(companyId, ['admin', 'finance']))
-          || (d.tipi == 'gjendje_fillestare' && hasRole(companyId, ['admin', 'finance'])
+            && can(companyId, 'rregullim_gjendjeje'))
+          || (d.tipi == 'gjendje_fillestare' && can(companyId, 'rregullim_gjendjeje')
             && before.fillestare.get(d.monedha, false) == false
             && after.fillestare.get(d.monedha, false) == true)
         );
@@ -114,9 +133,10 @@ service cloud.firestore {
         && !('kosto' in d);
     }
 
-    function validRole(r) { return r in ['admin', 'shites', 'finance', 'magazinier']; }
+    function validRole(r) { return r in ['admin', 'shites', 'finance', 'magazinier', 'personalizuar']; }
     function validUserDoc(d) {
-      return d.keys().hasOnly(['companyId', 'roli', 'emri', 'email', 'aktiv', 'krijuar'])
+      return d.keys().hasOnly(['companyId', 'roli', 'lejet', 'emri', 'email', 'aktiv', 'krijuar'])
+        && (!('lejet' in d) || d.lejet is list)
         && d.companyId is string
         && validRole(d.roli)
         && d.emri is string && d.emri.size() > 0
@@ -181,22 +201,22 @@ service cloud.firestore {
         allow write: if isAdmin(companyId);
       }
 
-      // Numëruesit e dokumenteve. Admini i ndryshon nga Cilësimet; Shitësi
-      // (kodet e klientëve) dhe Magazinieri (kodet e artikujve) vetëm i rrisin.
+      // Numëruesit e dokumenteve. Admini i ndryshon nga Cilësimet; kush ka lejen
+      // për klientë / artikuj vetëm i rrit (kodet KL### / A###).
       // Në Fazën 3 do të lejohet edhe rritja brenda lëshimit të faturës.
       match /counters/{key} {
         allow read: if isMember(companyId);
         allow write: if isAdmin(companyId)
-          || (key == 'clients' && hasRole(companyId, ['shites']) && counterIncreases())
-          || (key == 'items' && hasRole(companyId, ['magazinier']) && counterIncreases());
+          || (key == 'clients' && can(companyId, 'kliente_ndrysho') && counterIncreases())
+          || (key == 'items' && can(companyId, 'artikuj_ndrysho') && counterIncreases());
       }
 
       // ---------- Klientët ----------
       // Gjendja (`gjendje`) dhe pikët (`piket`) ndryshojnë VETËM bashkë me një
       // lëvizje të re në kartelë / pikë, dhe saktësisht me shumën e saj.
       match /clients/{clientId} {
-        allow read: if hasRole(companyId, ['admin', 'shites', 'finance', 'magazinier']);
-        allow create: if hasRole(companyId, ['admin', 'shites'])
+        allow read: if canAny(companyId, ['mod_kliente', 'mod_fature_e_re', 'mod_historiku', 'mod_financa', 'mod_raporte', 'mod_blerje', 'artikuj_ndrysho']);
+        allow create: if can(companyId, 'kliente_ndrysho')
           && validClient(request.resource.data)
           && request.resource.data.gjendje == {}
           && request.resource.data.fillestare == {}
@@ -205,18 +225,18 @@ service cloud.firestore {
           && request.resource.data.rastesor == (clientId == 'klient-rastesor');
         allow update: if (
             // (A) të dhënat e profilit / arkivimi
-            hasRole(companyId, ['admin', 'shites'])
+            can(companyId, 'kliente_ndrysho')
             && !changedKeys().hasAny(['gjendje', 'fillestare', 'piket', 'lastLedgerId', 'lastPointsId', 'kodi', 'rastesor', 'krijuar'])
             && validClient(request.resource.data)
             && !(resource.data.rastesor == true && request.resource.data.arkivuar == true)
           ) || (
-            // (B) lëvizje e re në kartelë
-            hasRole(companyId, ['admin', 'shites', 'finance'])
+            // (B) lëvizje e re në kartelë (leja kontrollohet te validLedger)
+            isMember(companyId)
             && changedKeys().hasOnly(['gjendje', 'fillestare', 'lastLedgerId'])
             && ledgerMatches(companyId, clientId)
           ) || (
             // (C) lëvizje e re pikësh
-            hasRole(companyId, ['admin', 'finance'])
+            can(companyId, 'piket')
             && changedKeys().hasOnly(['piket', 'lastPointsId'])
             && pointsMatch(companyId, clientId)
           );
@@ -225,21 +245,21 @@ service cloud.firestore {
 
       // Kartela: vetëm shtim. Gabimet korrigjohen me lëvizje të kundërt.
       match /ledger/{entryId} {
-        allow read: if hasRole(companyId, ['admin', 'shites', 'finance']);
+        allow read: if canAny(companyId, ['mod_kliente', 'mod_financa', 'mod_raporte']);
         allow create: if validLedger(companyId, entryId);
         allow update, delete: if false;
       }
 
       match /loyaltyPoints/{entryId} {
-        allow read: if hasRole(companyId, ['admin', 'shites', 'finance']);
-        allow create: if hasRole(companyId, ['admin', 'finance']) && validPoints(companyId, entryId);
+        allow read: if can(companyId, 'mod_kliente');
+        allow create: if can(companyId, 'piket') && validPoints(companyId, entryId);
         allow update, delete: if false;
       }
 
       // ---------- Artikujt ----------
       match /items/{itemId} {
         allow read: if isMember(companyId);
-        allow create, update: if hasRole(companyId, ['admin', 'magazinier'])
+        allow create, update: if can(companyId, 'artikuj_ndrysho')
           && validItem(request.resource.data)
           && getAfter(companyPath(companyId, 'itemCodes', request.resource.data.kodi)).data.itemId == itemId;
         allow delete: if false;
@@ -247,18 +267,18 @@ service cloud.firestore {
 
       // Kodi unik i artikullit: një dokument për çdo kod.
       match /itemCodes/{code} {
-        allow read: if hasRole(companyId, ['admin', 'magazinier']);
-        allow create: if hasRole(companyId, ['admin', 'magazinier'])
+        allow read: if can(companyId, 'artikuj_ndrysho');
+        allow create: if can(companyId, 'artikuj_ndrysho')
           && getAfter(companyPath(companyId, 'items', request.resource.data.itemId)).data.kodi == code;
-        allow delete: if hasRole(companyId, ['admin', 'magazinier'])
+        allow delete: if can(companyId, 'artikuj_ndrysho')
           && getAfter(companyPath(companyId, 'items', resource.data.itemId)).data.kodi != code;
         allow update: if false;
       }
 
-      // Kosto (çmimi i blerjes) – e fshehur nga Shitësi.
+      // Kosto (çmimi i blerjes) – vetëm me lejen "sheh_koston".
       match /itemCosts/{itemId} {
-        allow read: if hasRole(companyId, ['admin', 'finance', 'magazinier']);
-        allow write: if hasRole(companyId, ['admin', 'magazinier'])
+        allow read: if can(companyId, 'sheh_koston');
+        allow write: if can(companyId, 'artikuj_ndrysho') && can(companyId, 'sheh_koston')
           && request.resource.data.keys().hasOnly(['kosto'])
           && (request.resource.data.kosto == null
               || (request.resource.data.kosto is int && request.resource.data.kosto >= 0));
@@ -266,10 +286,10 @@ service cloud.firestore {
 
       match /preferentialPrices/{priceId} {
         allow read: if isMember(companyId);
-        allow create, update: if hasRole(companyId, ['admin', 'magazinier'])
+        allow create, update: if can(companyId, 'artikuj_ndrysho')
           && priceId == request.resource.data.itemId + '_' + request.resource.data.clientId
           && request.resource.data.cmimi is int && request.resource.data.cmimi >= 0;
-        allow delete: if hasRole(companyId, ['admin', 'magazinier']);
+        allow delete: if can(companyId, 'artikuj_ndrysho');
       }
 
       // Log-u i veprimeve: vetëm shtim, kurrë ndryshim ose fshirje.

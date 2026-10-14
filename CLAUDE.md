@@ -18,14 +18,14 @@ React + Vite, HashRouter, Firebase (vetëm Auth email/fjalëkalim + Firestore). 
   - **Pa paguar** – fatura më e fundit e klientit me gjendje > 0;
   - **Pasuar** – gjendja > 0 u bart te një faturë më e re;
   - **Anuluar**. Kur fatura që mban borxhin bëhet "E paguar", "Pasuar"-at para saj kalojnë në "E paguar".
-- Ndryshimi manual i gjendjes krijon lëvizje "rregullim manual" me diferencën, përdoruesin dhe arsyen (vetëm Admin/Financë).
+- Ndryshimi manual i gjendjes krijon lëvizje "rregullim manual" me diferencën, përdoruesin dhe arsyen (vetëm me lejen `rregullim_gjendjeje`).
 - Asnjë fshirje fizike e dokumenteve financiare – vetëm anulim me arsye. Çdo veprim shkruhet te `auditLog`.
-- Lejet e roleve (Admin, Shitës, Financë, Magazinier) zbatohen në **Firestore Security Rules**, jo vetëm në UI. Shitësi nuk sheh kosto/fitim.
+- **Lejet janë për çdo përdorues**: Admini i zgjedh kur krijon përdoruesin (nga shabllonet Shitës / Financë / Magazinier / I personalizuar) dhe mund t'i ndryshojë më vonë. Zbatohen në **Firestore Security Rules**, jo vetëm në UI. Kosto/fitimi vetëm me lejen `sheh_koston`.
 - Asnjë localStorage për të dhëna biznesi. Listat e mëdha me pagination.
 - Logjika e biznesit në `services/`, jo brenda komponentëve UI.
 
 ## Struktura (Faza 1)
-- Rolet: `admin`, `shites`, `finance`, `magazinier` → `src/config/roles.js` (UI) dhe `firestore.rules` (server). Mbaji të sinkronizuara.
+- Lejet: `src/config/permissions.js` (çelësat + shabllonet) ↔ `firestore.rules` (`can()`, `roleDefaults`). Mbaji të sinkronizuara. Në UI përdor `perms` nga `useAuth()` (Set), kurrë `role` për akses. Çdo modul i ri shton lejet e veta te të dyja vendet.
 - Admini i parë krijohet një herë përmes shënuesit `meta/bootstrap`; rules ndalojnë çdo vetë-ngritje në Admin.
 - Çdo shkrim + hyrja e `auditLog` në të njëjtin batch/transaction (`services/auditService.js`).
 

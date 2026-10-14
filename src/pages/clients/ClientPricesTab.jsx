@@ -10,8 +10,8 @@ import SearchPicker from '../../components/SearchPicker'
 
 /** Çmimet preferenciale të një klienti (çmimet janë në LEK). */
 export default function ClientPricesTab({ client }) {
-  const { role, profile } = useAuth()
-  const editable = canEditItems(role)
+  const { perms, profile } = useAuth()
+  const editable = canEditItems(perms)
   const { data: prices, error } = useLive((ok, ko) => watchPricesForClient(client.id, ok, ko), [client.id], { initial: [] })
   const { data: items } = useLive(watchItems, [], { initial: [] })
   const [itemId, setItemId] = useState('')

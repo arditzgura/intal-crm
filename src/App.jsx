@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import { SettingsProvider } from './hooks/useSettings'
-import { MODULES, homePathForRole } from './config/roles'
+import { MODULES, homePathFor } from './config/roles'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import StatusScreen from './components/StatusScreen'
@@ -22,7 +22,7 @@ const PAGES = {
 }
 
 export default function App() {
-  const { status, role, error } = useAuth()
+  const { status, perms, error } = useAuth()
 
   if (status === 'loading') return <StatusScreen loading title="Duke u ngarkuar…" />
   if (status === 'signedOut') return <LoginPage />
@@ -83,7 +83,7 @@ export default function App() {
             }
           />
           <Route path="/profili" element={<ProfilePage />} />
-          <Route path="*" element={<Navigate to={homePathForRole(role)} replace />} />
+          <Route path="*" element={<Navigate to={homePathFor(perms)} replace />} />
         </Route>
       </Routes>
     </SettingsProvider>

@@ -28,7 +28,7 @@ const TABS = [
 
 export default function ClientProfilePage() {
   const { id } = useParams()
-  const { role, profile } = useAuth()
+  const { perms, profile } = useAuth()
   const [params, setParams] = useSearchParams()
   const tab = params.get('skeda') ?? 'kartela'
   const [modal, setModal] = useState(null)
@@ -46,8 +46,8 @@ export default function ClientProfilePage() {
   const invoiced = {}
   for (const e of ledger.filter((x) => x.tipi === 'fature')) invoiced[e.monedha] = (invoiced[e.monedha] ?? 0) + e.shuma
 
-  const editable = canEditClients(role)
-  const canOther = OTHER_MOVEMENTS.some((t) => canLedger(role, t))
+  const editable = canEditClients(perms)
+  const canOther = OTHER_MOVEMENTS.some((t) => canLedger(perms, t))
 
   async function toggleArchive() {
     const msg = client.arkivuar ? 'Të riaktivizohet klienti?' : 'Të arkivohet klienti? Nuk fshihet; thjesht fshihet nga lista.'
@@ -77,11 +77,11 @@ export default function ClientProfilePage() {
             </div>
           </div>
           <div className="actions">
-            {canLedger(role, 'pagese') && (
+            {canLedger(perms, 'pagese') && (
               <button className="btn primary" onClick={() => setModal('pagese')}><Wallet size={16} /> Regjistro pagesë</button>
             )}
             {canOther && <button className="btn" onClick={() => setModal('tjeter')}>Lëvizje tjetër</button>}
-            {canLedger(role, 'rregullim') && (
+            {canLedger(perms, 'rregullim') && (
               <button className="btn" onClick={() => setModal('rregullim')}><SlidersHorizontal size={16} /> Rregullim gjendjeje</button>
             )}
             {editable && <button className="btn" onClick={() => setModal('edit')}><Pencil size={16} /> Ndrysho</button>}
@@ -117,7 +117,7 @@ export default function ClientProfilePage() {
             )
           })}
         </div>
-        {canLedger(role, 'gjendje_fillestare') && Object.keys(CURRENCIES).some((c) => !client.fillestare?.[c]) && (
+        {canLedger(perms, 'gjendje_fillestare') && Object.keys(CURRENCIES).some((c) => !client.fillestare?.[c]) && (
           <button className="btn link small" onClick={() => setModal('gjendje_fillestare')}>
             + Vendos gjendjen fillestare
           </button>
@@ -144,7 +144,7 @@ export default function ClientProfilePage() {
       {tab === 'piket' && (
         <PointsTab
           client={client}
-          onAdjust={canAdjustPoints(role) && !client.rastesor ? () => setModal('piket') : null}
+          onAdjust={canAdjustPoints(perms) && !client.rastesor ? () => setModal('piket') : null}
         />
       )}
       {tab === 'cmimet' && <ClientPricesTab client={client} />}

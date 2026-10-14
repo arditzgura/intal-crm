@@ -13,10 +13,10 @@ import Pagination, { usePaged } from '../../components/Pagination'
 import ItemFormModal from './ItemFormModal'
 
 export default function ItemsPage() {
-  const { role } = useAuth()
+  const { perms } = useAuth()
   const { settings } = useSettings()
-  const showCost = canSeeCost(role)
-  const editable = canEditItems(role)
+  const showCost = canSeeCost(perms)
+  const editable = canEditItems(perms)
   const { data: items, loading, error } = useLive(watchItems, [], { initial: [] })
   const { data: costs } = useLive(watchItemCosts, [], { enabled: showCost, initial: {} })
   const [q, setQ] = useState('')

@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useSettings } from '../hooks/useSettings'
-import { ROLES, modulesForRole } from '../config/roles'
+import { ROLES, modulesFor } from '../config/roles'
 import Icon from './Icon'
 
 export function initials(name = '') {
@@ -11,9 +11,9 @@ export function initials(name = '') {
 }
 
 export default function Sidebar() {
-  const { profile, role } = useAuth()
+  const { profile, role, perms } = useAuth()
   const { settings } = useSettings()
-  const modules = modulesForRole(role)
+  const modules = modulesFor(perms)
   const primary = modules.find((m) => m.primary)
   const rest = modules.filter((m) => !m.primary)
 

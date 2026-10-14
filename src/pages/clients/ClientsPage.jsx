@@ -18,7 +18,7 @@ const SORTS = {
 }
 
 export default function ClientsPage() {
-  const { role, profile } = useAuth()
+  const { perms, profile } = useAuth()
   const navigate = useNavigate()
   const { data: clients, loading, error } = useLive(watchClients, [], { initial: [] })
   const [q, setQ] = useState('')
@@ -26,7 +26,7 @@ export default function ClientsPage() {
   const [sort, setSort] = useState('emri')
   const [showArchived, setShowArchived] = useState(false)
   const [creating, setCreating] = useState(false)
-  const editable = canEditClients(role)
+  const editable = canEditClients(perms)
 
   useEffect(() => {
     if (editable) ensureWalkInClient(profile?.emri).catch((err) => console.warn(err))

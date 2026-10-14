@@ -20,9 +20,9 @@ const TITLES = {
  * mode: 'pagese' | 'tjeter' (kthim/zbritje/postë) | 'rregullim' | 'gjendje_fillestare'
  */
 export default function LedgerEntryModal({ mode, client, onClose }) {
-  const { role, profile } = useAuth()
+  const { perms, profile } = useAuth()
   const { settings } = useSettings()
-  const otherTypes = OTHER_MOVEMENTS.filter((t) => canLedger(role, t))
+  const otherTypes = OTHER_MOVEMENTS.filter((t) => canLedger(perms, t))
   const availableCurrencies =
     mode === 'gjendje_fillestare'
       ? Object.keys(CURRENCIES).filter((c) => !client.fillestare?.[c])

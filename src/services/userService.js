@@ -73,7 +73,7 @@ export async function listCompanyUsers() {
  * Admini krijon një përdorues të ri. Llogaria e Auth krijohet me një instancë
  * të dytë të Firebase, që Admini të mos dalë nga llogaria e vet.
  */
-export async function createCompanyUser({ emri, email, password, roli }, actorName) {
+export async function createCompanyUser({ emri, email, password, roli, lejet }, actorName) {
   const secondary = initializeApp(firebaseConfig, `krijim-${Date.now()}`)
   try {
     const secondaryAuth = getAuth(secondary)
@@ -84,6 +84,7 @@ export async function createCompanyUser({ emri, email, password, roli }, actorNa
     batch.set(doc(db, 'users', cred.user.uid), {
       companyId: COMPANY_ID,
       roli,
+      lejet: roli === 'admin' ? [] : lejet,
       emri: emri.trim(),
       email: email.trim(),
       aktiv: true,
@@ -93,7 +94,7 @@ export async function createCompanyUser({ emri, email, password, roli }, actorNa
       action: 'krijim_perdoruesi',
       entity: 'users',
       entityId: cred.user.uid,
-      details: { emri: emri.trim(), email: email.trim(), roli },
+      details: { emri: emri.trim(), email: email.trim(), roli, lejet },
       actorName,
     })
     await batch.commit()
