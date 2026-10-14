@@ -1,0 +1,9 @@
+data/
+firebase-config*.txt
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+.firebase/
+*.log

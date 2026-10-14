@@ -1,0 +1,109 @@
+rules_version = '2';
+
+// INTAL PRO – Firestore Security Rules (Faza 1)
+// Lejet e roleve zbatohen këtu, jo vetëm në UI. Çdo gjë që nuk lejohet
+// shprehimisht është e ndaluar.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Ndihmës ----------
+    function signedIn() { return request.auth != null; }
+    function userPath(uid) { return /databases/$(database)/documents/users/$(uid); }
+    function bootstrapPath() { return /databases/$(database)/documents/meta/bootstrap; }
+    function me() { return get(userPath(request.auth.uid)).data; }
+
+    function isMember(companyId) {
+      return signedIn()
+        && exists(userPath(request.auth.uid))
+        && me().companyId == companyId
+        && me().aktiv == true;
+    }
+    function hasRole(companyId, roles) { return isMember(companyId) && me().roli in roles; }
+    function isAdmin(companyId) { return hasRole(companyId, ['admin']); }
+
+    function validRole(r) { return r in ['admin', 'shites', 'finance', 'magazinier']; }
+    function validUserDoc(d) {
+      return d.keys().hasOnly(['companyId', 'roli', 'emri', 'email', 'aktiv', 'krijuar'])
+        && d.companyId is string
+        && validRole(d.roli)
+        && d.emri is string && d.emri.size() > 0
+        && d.email is string
+        && d.aktiv is bool;
+    }
+
+    // ---------- Konfigurimi fillestar (vetëm një herë) ----------
+    // Shënuesi krijohet në të njëjtin batch me Adminin e parë dhe nuk
+    // ndryshohet / fshihet kurrë. Kur ekziston, askush s'mund të bëhet
+    // Admin vetë; Adminët e rinj i krijon vetëm një Admin ekzistues.
+    match /meta/bootstrap {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['adminUid', 'companyId', 'krijuar'])
+        && request.resource.data.adminUid == request.auth.uid
+        && request.resource.data.companyId == 'intal'
+        && getAfter(userPath(request.auth.uid)).data.roli == 'admin'
+        && getAfter(userPath(request.auth.uid)).data.companyId == 'intal';
+      allow update, delete: if false;
+    }
+
+    // ---------- Përdoruesit ----------
+    match /users/{uid} {
+      allow read: if signedIn()
+        && (request.auth.uid == uid || isAdmin(resource.data.companyId));
+
+      allow create: if signedIn() && validUserDoc(request.resource.data) && (
+        // (a) Admini i parë: vetëm kur shënuesi nuk ekziston dhe krijohet në të njëjtin batch
+        (
+          request.auth.uid == uid
+          && request.resource.data.roli == 'admin'
+          && request.resource.data.aktiv == true
+          && request.resource.data.companyId == 'intal'
+          && !exists(bootstrapPath())
+          && getAfter(bootstrapPath()).data.adminUid == uid
+        )
+        ||
+        // (b) Admini krijon përdorues të tjerë në kompaninë e vet
+        (
+          request.auth.uid != uid
+          && isAdmin(request.resource.data.companyId)
+        )
+      );
+
+      // Vetëm Admini ndryshon përdoruesit e tjerë; askush nuk ndryshon veten
+      // (pra askush nuk mund t'i japë vetes rol tjetër).
+      allow update: if request.auth.uid != uid
+        && isAdmin(resource.data.companyId)
+        && validUserDoc(request.resource.data)
+        && request.resource.data.companyId == resource.data.companyId
+        && request.resource.data.email == resource.data.email;
+
+      allow delete: if false;
+    }
+
+    // ---------- Të dhënat e kompanisë ----------
+    match /companies/{companyId} {
+
+      match /settings/{docId} {
+        allow read: if isMember(companyId);
+        allow write: if isAdmin(companyId);
+      }
+
+      // Numëruesit e dokumenteve. Në Fazën 3 do të lejohet edhe rritja
+      // brenda transaction-it të lëshimit të faturës.
+      match /counters/{key} {
+        allow read: if isMember(companyId);
+        allow write: if isAdmin(companyId);
+      }
+
+      // Log-u i veprimeve: vetëm shtim, kurrë ndryshim ose fshirje.
+      match /auditLog/{entryId} {
+        allow read: if isAdmin(companyId);
+        allow create: if isMember(companyId)
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.koha == request.time;
+        allow update, delete: if false;
+      }
+    }
+  }
+}
