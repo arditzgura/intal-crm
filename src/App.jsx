@@ -17,6 +17,11 @@ import ItemProfilePage from './pages/items/ItemProfilePage'
 import NewInvoicePage from './pages/invoices/NewInvoicePage'
 import HistoryPage from './pages/invoices/HistoryPage'
 import InvoiceViewPage from './pages/invoices/InvoiceViewPage'
+import InventoryPage from './pages/inventory/InventoryPage'
+import PurchasesPage from './pages/purchases/PurchasesPage'
+import NewPurchasePage from './pages/purchases/NewPurchasePage'
+import PurchaseViewPage from './pages/purchases/PurchaseViewPage'
+import SalesPage from './pages/sales/SalesPage'
 import { errorMessage } from './services/authService'
 
 const PAGES = {
@@ -25,6 +30,9 @@ const PAGES = {
   artikujt: ItemsPage,
   'fature-e-re': NewInvoicePage,
   historiku: HistoryPage,
+  inventari: InventoryPage,
+  blerje: PurchasesPage,
+  shitjet: SalesPage,
 }
 
 export default function App() {
@@ -101,6 +109,22 @@ export default function App() {
             element={
               <ProtectedRoute moduleKey={['historiku', 'fature-e-re', 'kliente']}>
                 <InvoiceViewPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/blerje/e-re"
+            element={
+              <ProtectedRoute moduleKey="blerje">
+                <NewPurchasePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/blerje/:id"
+            element={
+              <ProtectedRoute moduleKey="blerje">
+                <PurchaseViewPage />
               </ProtectedRoute>
             }
           />

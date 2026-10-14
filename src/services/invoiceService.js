@@ -7,6 +7,7 @@ import { companyCol, companyDoc, newDocRef } from './paths'
 import { addAudit } from './auditService'
 import { ledgerEntryData } from './ledgerService'
 import { formatDocNumber } from './settingsService'
+import { aggregateByItem, writeMovement } from './stockService'
 import {
   ISSUED, invoiceRef, readSettings, readIssued, readPasuarChain, awardPoints,
   writePointsEntry, numbersText, planLatestChange, applyLatestChange,
@@ -19,7 +20,7 @@ import { millis } from '../utils/date'
  * Draft → Lëshim bëhet në NJË transaction:
  *   numri (counters/invoices + invoiceNumbers/{numri} unik) · kartela (faturë,
  *   pagesë, rregullim) · zinxhiri (e mëparshmja → Pasuar / E paguar) · pikët ·
- *   rreshtat (invoiceLines) · lëvizjet e stokut (dalje) · auditLog.
+ *   rreshtat (invoiceLines) · lëvizjet e stokut (dalje) + stock/{itemId} · auditLog.
  * Fatura e lëshuar nuk ndryshohet; korrigjimi bëhet me anulim.
  */
 
@@ -207,19 +208,11 @@ export async function issueInvoice(draftId, data, actorName) {
         kursi,
         anuluar: false,
       })
-      tx.set(newDocRef('stockMovements'), {
-        itemId: l.itemId,
-        tipi: 'dalje',
-        sasia: -l.sasia,
-        dokument: 'fature',
-        invoiceId: ref.id,
-        numri: n,
-        data: data.data,
-        uid,
-        emri: actorName ?? '',
-        krijuar: serverTimestamp(),
-      })
     })
+    // Stoku: një lëvizje "dalje" për çdo artikull
+    for (const m of aggregateByItem(rreshtat)) {
+      writeMovement(tx, { itemId: m.itemId, sasia: -m.sasia, tipi: 'dalje', dokument: 'fature', invoiceId: ref.id, numri: n, data: data.data }, actorName)
+    }
 
     // Kartela: [rregullim] + faturë + [pagesë]
     const ledgerIds = []
@@ -338,19 +331,10 @@ export async function cancelInvoice(id, arsye, actorName) {
 
     X.rreshtat.forEach((l, i) => {
       tx.update(companyDoc('invoiceLines', lineId(id, i)), { anuluar: true })
-      tx.set(newDocRef('stockMovements'), {
-        itemId: l.itemId,
-        tipi: 'kthim_anulim',
-        sasia: l.sasia,
-        dokument: 'anulim_fature',
-        invoiceId: id,
-        numri: X.numri,
-        data: serverTimestamp(),
-        uid,
-        emri: actorName ?? '',
-        krijuar: serverTimestamp(),
-      })
     })
+    for (const m of aggregateByItem(X.rreshtat)) {
+      writeMovement(tx, { itemId: m.itemId, sasia: m.sasia, tipi: 'kthim_anulim', dokument: 'anulim_fature', invoiceId: id, numri: X.numri }, actorName)
+    }
 
     const now = serverTimestamp()
     const ledgerIds = []

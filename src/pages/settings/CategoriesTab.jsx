@@ -46,7 +46,7 @@ const uniqAdd = (list, v) => (list.some((x) => x.toLowerCase() === v.toLowerCase
 
 export default function CategoriesTab() {
   const form = useSectionForm('kategorite')
-  const { artikuj = [], blerje = [], shpenzime = [] } = form.draft
+  const { artikuj = [], blerje = [], shpenzime = [], origjinat = [] } = form.draft
   const set = (patch) => form.update(patch)
 
   return (
@@ -85,6 +85,13 @@ export default function CategoriesTab() {
         <h3>Kategoritë e blerjeve</h3>
         <Chips items={blerje} onRemove={(v) => set({ blerje: blerje.filter((x) => x !== v) })} />
         <AddInput placeholder="Kategori e re" onAdd={(v) => set({ blerje: uniqAdd(blerje, v) })} />
+      </section>
+
+      <section className="subsection">
+        <h3>Origjinat e brendshme të hyrjeve</h3>
+        <p className="muted small">P.sh. "Magazina Qendrore". Hyrjet nga këto origjina nuk krijojnë detyrim.</p>
+        <Chips items={origjinat} onRemove={(v) => set({ origjinat: origjinat.filter((x) => x !== v) })} />
+        <AddInput placeholder="Origjinë e re" onAdd={(v) => set({ origjinat: uniqAdd(origjinat, v) })} />
       </section>
 
       <section className="subsection">

@@ -435,3 +435,13 @@ tr.row-error td { background: #fff7ed; }
 }
 
 .add-line { padding: 12px 14px; border-top: 1px solid var(--border); }
+
+/* ---------- Faza 4: inventari, blerjet ---------- */
+.inv-cards { margin-bottom: 14px; }
+.clickable-card { cursor: pointer; }
+.clickable-card:hover { border-color: var(--primary); }
+tr.row-neg td { background: #fef2f2; }
+tr.row-low td { background: #fffbeb; }
+.warn-icon { color: #d97706; margin-left: 4px; vertical-align: -2px; }
+.stock-warn { color: #b45309; display: flex; align-items: center; gap: 4px; }
+.plain-filters { padding: 0; margin-bottom: 10px; }

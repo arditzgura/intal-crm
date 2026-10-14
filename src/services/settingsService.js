@@ -71,6 +71,7 @@ export const DEFAULT_SETTINGS = {
       { emri: 'Stinore', nen: [] },
     ],
     blerje: ['Lëndë e parë', 'Aksesorë', 'Mall'],
+    origjinat: ['Magazina Qendrore'], // origjinat e brendshme të hyrjeve (pa detyrim)
     shpenzime: ['Paga', 'Qira', 'Energji', 'Transport', 'Të tjera'],
   },
 }

@@ -40,6 +40,11 @@ React + Vite, HashRouter, Firebase (vetëm Auth email/fjalëkalim + Firestore). 
 - Zinxhiri: `clients.faturaFundit.{MONEDHA}` = fatura që mban borxhin; `invoices.mbetur` ndryshon me çdo lëvizje kartele; logjika e statuseve dhe pikëve te `services/invoiceChain.js` (përdoret nga lëshimi, pagesat dhe anulimi). Fushat e printuara (gjendjaPara/paguar/gjendjaRe) nuk ndryshojnë kurrë.
 - Klienti mund të marrë 1–3 lëvizje kartele në një transaction (`lastLedgerIds`); rules verifikojnë shumën.
 - `invoiceLines` (statistikat e klientit/artikullit), `stockMovements` (dalje/kthim_anulim), `costHistory` (fitimi me koston në datën e faturës).
+
+## Struktura (Faza 4)
+- Stoku: burimi = `stockMovements` (vetëm shtim; dalje/kthim_anulim/hyrje/anulim_hyrje/rregullim). `stock/{itemId}.sasia` = kopje me `increment()` në të njëjtin transaction (`services/stockService.writeMovement`, një lëvizje për artikull për dokument). Admini e rindërton me "Rillogarit stokun". Rules nuk e verifikojnë kopjen (limiti 20 akses/transaction).
+- Hyrjet: `purchases` + `purchaseNumbers/{numri}` + `counters/purchases` (`services/purchaseService.js`). Kosto nga hyrja → `itemCosts` + `costHistory` me `burim`.
+- Detyrimi ndaj furnitorit veçmas nga kartela e klientit: `clients.detyrimFurnitori.{MONEDHA}` + `supplierLedger` (`lastSupplierLedgerId`).
 - Rules dhe indekset publikohen me `npx firebase-tools deploy --only firestore` (pyet para çdo deploy-i).
 - Repo në GitHub: `intal-crm` (`base: '/intal-crm/'`). Repo-ja `intal-pro` është sistemi i vjetër – mos e prek.
 

@@ -19,6 +19,7 @@ import PointsTab from './PointsTab'
 import ClientPricesTab from './ClientPricesTab'
 import { InvoiceList } from '../invoices/HistoryPage'
 import ClientPurchases from './ClientPurchases'
+import SupplierTab from './SupplierTab'
 
 const TABS = [
   ['kartela', 'Kartela'],
@@ -128,7 +129,7 @@ export default function ClientProfilePage() {
       </div>
 
       <div className="tabs no-print" role="tablist">
-        {TABS.map(([k, label]) => (
+        {[...TABS, ...(client.tipi !== 'klient' ? [['furnitori', 'Furnitori']] : [])].map(([k, label]) => (
           <button key={k} role="tab" className={`tab ${tab === k ? 'active' : ''}`} onClick={() => setParams({ skeda: k })}>
             {label}
           </button>
@@ -147,6 +148,7 @@ export default function ClientProfilePage() {
         />
       )}
       {tab === 'cmimet' && <ClientPricesTab client={client} />}
+      {tab === 'furnitori' && <SupplierTab client={client} />}
 
       {modal === 'edit' && <ClientFormModal client={client} onClose={() => setModal(null)} />}
       {['pagese', 'tjeter', 'rregullim', 'gjendje_fillestare'].includes(modal) && (

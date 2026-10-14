@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// INTAL PRO – Firestore Security Rules (Faza 1–3)
+// INTAL PRO – Firestore Security Rules (Faza 1–4)
 // Lejet e roleve zbatohen këtu, jo vetëm në UI. Çdo gjë që nuk lejohet
 // shprehimisht është e ndaluar.
 
@@ -29,9 +29,9 @@ service cloud.firestore {
       return r == 'shites'
         ? ['mod_fature_e_re', 'mod_historiku', 'mod_kliente', 'mod_artikujt', 'mod_inventari', 'fature_leshim', 'kliente_ndrysho', 'pagese']
         : r == 'finance'
-          ? ['mod_historiku', 'mod_kliente', 'mod_blerje', 'mod_financa', 'mod_raporte', 'pagese', 'levizje_kartele', 'rregullim_gjendjeje', 'piket', 'sheh_koston']
+          ? ['mod_historiku', 'mod_kliente', 'mod_blerje', 'mod_financa', 'mod_raporte', 'pagese', 'levizje_kartele', 'rregullim_gjendjeje', 'piket', 'sheh_koston', 'blerje_regjistro']
           : r == 'magazinier'
-            ? ['mod_artikujt', 'mod_blerje', 'mod_inventari', 'artikuj_ndrysho', 'sheh_koston']
+            ? ['mod_artikujt', 'mod_blerje', 'mod_inventari', 'artikuj_ndrysho', 'sheh_koston', 'blerje_regjistro', 'inventar_rregullim']
             : [];
     }
     function myPerms() { return me().get('lejet', roleDefaults(me().roli)); }
@@ -164,6 +164,34 @@ service cloud.firestore {
         );
     }
 
+    // Detyrimi ndaj furnitorit ndryshon vetëm me një lëvizje të re në supplierLedger.
+    function supplierLedgerMatches(companyId, clientId) {
+      let id = request.resource.data.lastSupplierLedgerId;
+      let e = getAfter(companyPath(companyId, 'supplierLedger', id)).data;
+      let oldMap = resource.data.get('detyrimFurnitori', {});
+      return !exists(companyPath(companyId, 'supplierLedger', id))
+        && e.clientId == clientId
+        && request.resource.data.detyrimFurnitori.diff(oldMap).affectedKeys().hasOnly([e.monedha])
+        && request.resource.data.detyrimFurnitori.get(e.monedha, 0) == oldMap.get(e.monedha, 0) + e.shuma;
+    }
+    function purchaseAfter(companyId, id) { return getAfter(companyPath(companyId, 'purchases', id)).data; }
+    // Hyrja u regjistrua në këtë kërkesë.
+    function purchasedNow(companyId, id) {
+      return id is string && purchaseAfter(companyId, id).krijuar == request.time;
+    }
+    function purchaseOk(companyId, purchaseId) {
+      let d = request.resource.data;
+      let numPath = companyPath(companyId, 'purchaseNumbers', string(d.numri));
+      return d.numri is int && d.numri > 0
+        && !exists(numPath)
+        && getAfter(numPath).data.purchaseId == purchaseId
+        && d.statusi == 'regjistruar'
+        && d.krijuar == request.time
+        && d.krijuarNga.uid == request.auth.uid
+        && d.totaliBlerje is int && d.totaliShitje is int
+        && d.anuluar == null;
+    }
+
     function isDraft(d) { return d.statusi == 'draft' && d.numri == null; }
     function issuedOk(companyId, invoiceId) {
       let d = request.resource.data;
@@ -265,14 +293,15 @@ service cloud.firestore {
         allow write: if isAdmin(companyId)
           || (key == 'clients' && can(companyId, 'kliente_ndrysho') && counterIncreases())
           || (key == 'items' && can(companyId, 'artikuj_ndrysho') && counterIncreases())
-          || (key == 'invoices' && can(companyId, 'fature_leshim') && counterIncreases());
+          || (key == 'invoices' && can(companyId, 'fature_leshim') && counterIncreases())
+          || (key == 'purchases' && can(companyId, 'blerje_regjistro') && counterIncreases());
       }
 
       // ---------- Klientët ----------
       // Gjendja (`gjendje`) dhe pikët (`piket`) ndryshojnë VETËM bashkë me një
       // lëvizje të re në kartelë / pikë, dhe saktësisht me shumën e saj.
       match /clients/{clientId} {
-        allow read: if canAny(companyId, ['mod_kliente', 'mod_fature_e_re', 'mod_historiku', 'mod_financa', 'mod_raporte', 'mod_blerje', 'artikuj_ndrysho']);
+        allow read: if canAny(companyId, ['mod_kliente', 'mod_fature_e_re', 'mod_historiku', 'mod_financa', 'mod_raporte', 'mod_blerje', 'mod_shitjet', 'artikuj_ndrysho']);
         allow create: if can(companyId, 'kliente_ndrysho')
           && validClient(request.resource.data)
           && request.resource.data.gjendje == {}
@@ -283,7 +312,7 @@ service cloud.firestore {
         allow update: if (
             // (A) të dhënat e profilit / arkivimi
             can(companyId, 'kliente_ndrysho')
-            && !changedKeys().hasAny(['gjendje', 'fillestare', 'piket', 'lastLedgerId', 'lastLedgerIds', 'lastPointsId', 'faturaFundit', 'kodi', 'rastesor', 'krijuar'])
+            && !changedKeys().hasAny(['gjendje', 'fillestare', 'piket', 'lastLedgerId', 'lastLedgerIds', 'lastPointsId', 'faturaFundit', 'detyrimFurnitori', 'lastSupplierLedgerId', 'kodi', 'rastesor', 'krijuar'])
             && validClient(request.resource.data)
             && !(resource.data.rastesor == true && request.resource.data.arkivuar == true)
           ) || (
@@ -299,6 +328,11 @@ service cloud.firestore {
             can(companyId, 'piket')
             && changedKeys().hasOnly(['piket', 'lastPointsId'])
             && pointsMatch(companyId, clientId)
+          ) || (
+            // (D) detyrimi ndaj furnitorit (leja kontrollohet te supplierLedger)
+            isMember(companyId)
+            && changedKeys().hasOnly(['detyrimFurnitori', 'lastSupplierLedgerId'])
+            && supplierLedgerMatches(companyId, clientId)
           );
         allow delete: if false;
       }
@@ -321,7 +355,8 @@ service cloud.firestore {
         allow read: if isMember(companyId);
         allow create, update: if can(companyId, 'artikuj_ndrysho')
           && validItem(request.resource.data)
-          && getAfter(companyPath(companyId, 'itemCodes', request.resource.data.kodi)).data.itemId == itemId;
+          && ((resource != null && request.resource.data.kodi == resource.data.kodi)
+              || getAfter(companyPath(companyId, 'itemCodes', request.resource.data.kodi)).data.itemId == itemId);
         allow delete: if false;
       }
 
@@ -338,10 +373,12 @@ service cloud.firestore {
       // Kosto (çmimi i blerjes) – vetëm me lejen "sheh_koston".
       match /itemCosts/{itemId} {
         allow read: if can(companyId, 'sheh_koston');
-        allow write: if can(companyId, 'artikuj_ndrysho') && can(companyId, 'sheh_koston')
-          && request.resource.data.keys().hasOnly(['kosto'])
+        allow write: if can(companyId, 'sheh_koston')
+          && request.resource.data.keys().hasOnly(['kosto', 'burim'])
           && (request.resource.data.kosto == null
-              || (request.resource.data.kosto is int && request.resource.data.kosto >= 0));
+              || (request.resource.data.kosto is int && request.resource.data.kosto >= 0))
+          && (can(companyId, 'artikuj_ndrysho')
+              || (can(companyId, 'blerje_regjistro') && purchasedNow(companyId, request.resource.data.burim)));
       }
 
       match /preferentialPrices/{priceId} {
@@ -394,14 +431,76 @@ service cloud.firestore {
         allow delete: if false;
       }
 
-      // Lëvizjet e stokut: vetëm shtim (Faza 3: daljet nga faturat dhe kthimet nga anulimi).
+      // Lëvizjet e stokut: vetëm shtim. Burimi i së vërtetës për stokun.
       match /stockMovements/{movementId} {
         allow read: if canAny(companyId, ['mod_inventari', 'mod_artikujt', 'mod_blerje', 'mod_raporte']);
-        allow create: if request.resource.data.uid == request.auth.uid && (
-            (request.resource.data.tipi == 'dalje' && can(companyId, 'fature_leshim')
-              && issuedNow(companyId, request.resource.data.invoiceId))
-            || (request.resource.data.tipi == 'kthim_anulim' && can(companyId, 'anulim_fature')
+        allow create: if request.resource.data.uid == request.auth.uid
+          && request.resource.data.krijuar == request.time
+          && request.resource.data.sasia is int && request.resource.data.sasia != 0 && (
+            (request.resource.data.tipi == 'dalje' && request.resource.data.sasia < 0
+              && can(companyId, 'fature_leshim') && issuedNow(companyId, request.resource.data.invoiceId))
+            || (request.resource.data.tipi == 'kthim_anulim' && request.resource.data.sasia > 0
+              && can(companyId, 'anulim_fature')
               && invoiceAfter(companyId, request.resource.data.invoiceId).statusi == 'anuluar')
+            || (request.resource.data.tipi == 'hyrje' && request.resource.data.sasia > 0
+              && can(companyId, 'blerje_regjistro') && purchasedNow(companyId, request.resource.data.purchaseId))
+            || (request.resource.data.tipi == 'anulim_hyrje' && request.resource.data.sasia < 0
+              && can(companyId, 'blerje_anulo')
+              && purchaseAfter(companyId, request.resource.data.purchaseId).statusi == 'anuluar')
+            || (request.resource.data.tipi == 'rregullim' && can(companyId, 'inventar_rregullim')
+              && request.resource.data.arsye is string && request.resource.data.arsye.size() > 0)
+          );
+        allow update, delete: if false;
+      }
+
+      // Kopja e stokut për shpejtësi (increment në të njëjtin transaction me lëvizjen).
+      // Mund të rindërtohet nga Admini me "Rillogarit stokun".
+      match /stock/{itemId} {
+        allow read: if isMember(companyId);
+        allow create, update: if canAny(companyId, ['fature_leshim', 'anulim_fature', 'blerje_regjistro', 'blerje_anulo', 'inventar_rregullim'])
+          && request.resource.data.keys().hasOnly(['sasia', 'rillogaritur'])
+          && request.resource.data.sasia is int;
+        allow delete: if false;
+      }
+
+      // ---------- Blerje (hyrje malli) ----------
+      match /purchases/{purchaseId} {
+        allow read: if can(companyId, 'mod_blerje');
+        allow create: if can(companyId, 'blerje_regjistro') && purchaseOk(companyId, purchaseId);
+        allow update: if can(companyId, 'blerje_anulo')
+          && resource.data.statusi == 'regjistruar'
+          && request.resource.data.statusi == 'anuluar'
+          && changedKeys().hasOnly(['statusi', 'anuluar'])
+          && request.resource.data.anuluar.arsye is string && request.resource.data.anuluar.arsye.size() > 0
+          && request.resource.data.anuluar.uid == request.auth.uid;
+        allow delete: if false;
+      }
+
+      match /purchaseNumbers/{n} {
+        allow read: if can(companyId, 'blerje_regjistro');
+        allow create: if can(companyId, 'blerje_regjistro')
+          && purchaseAfter(companyId, request.resource.data.purchaseId).numri == int(n);
+        allow update, delete: if false;
+      }
+
+      // Kartela e furnitorit: vetëm shtim (blerje +, anulim / pagesë −).
+      match /supplierLedger/{entryId} {
+        allow read: if canAny(companyId, ['mod_blerje', 'mod_financa', 'mod_kliente']);
+        allow create: if request.resource.data.uid == request.auth.uid
+          && request.resource.data.krijuar == request.time
+          && request.resource.data.monedha in ['LEK', 'EUR', 'USD']
+          && request.resource.data.shuma is int && request.resource.data.shuma != 0
+          && request.resource.data.detyrimiPas == request.resource.data.detyrimiPara + request.resource.data.shuma
+          && getAfter(companyPath(companyId, 'clients', request.resource.data.clientId)).data.lastSupplierLedgerId == entryId
+          && (
+            (request.resource.data.tipi == 'blerje' && request.resource.data.shuma > 0
+              && can(companyId, 'blerje_regjistro')
+              && purchasedNow(companyId, request.resource.data.purchaseId)
+              && purchaseAfter(companyId, request.resource.data.purchaseId).furnitorId == request.resource.data.clientId
+              && purchaseAfter(companyId, request.resource.data.purchaseId).totaliBlerje == request.resource.data.shuma)
+            || (request.resource.data.tipi == 'anulim_blerje' && request.resource.data.shuma < 0
+              && can(companyId, 'blerje_anulo')
+              && purchaseAfter(companyId, request.resource.data.purchaseId).statusi == 'anuluar')
           );
         allow update, delete: if false;
       }
@@ -409,8 +508,11 @@ service cloud.firestore {
       // Historiku i kostos (fitimi me koston në datën e faturës).
       match /costHistory/{entryId} {
         allow read: if can(companyId, 'sheh_koston');
-        allow create: if can(companyId, 'artikuj_ndrysho') && can(companyId, 'sheh_koston')
-          && request.resource.data.kosto is int && request.resource.data.nga == request.time;
+        allow create: if can(companyId, 'sheh_koston') && request.resource.data.kosto is int && (
+            (can(companyId, 'artikuj_ndrysho') && request.resource.data.nga == request.time)
+            || (can(companyId, 'blerje_regjistro') && request.resource.data.nga is timestamp
+                && purchasedNow(companyId, request.resource.data.burim))
+          );
         allow update, delete: if false;
       }
 

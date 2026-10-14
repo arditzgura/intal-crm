@@ -37,6 +37,14 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    label: 'Blerje dhe Inventari',
+    items: [
+      ['blerje_regjistro', 'Regjistro hyrje malli'],
+      ['blerje_anulo', 'Anulo hyrje malli (me arsye)'],
+      ['inventar_rregullim', 'Rregullim / inventarizim stoku'],
+    ],
+  },
+  {
     label: 'Artikujt',
     items: [
       ['artikuj_ndrysho', 'Krijo / ndrysho artikuj dhe çmime preferenciale'],
@@ -56,11 +64,11 @@ export const TEMPLATES = {
   },
   finance: {
     label: 'Financë',
-    lejet: ['mod_historiku', 'mod_kliente', 'mod_blerje', 'mod_financa', 'mod_raporte', 'pagese', 'levizje_kartele', 'rregullim_gjendjeje', 'piket', 'sheh_koston'],
+    lejet: ['mod_historiku', 'mod_kliente', 'mod_blerje', 'mod_financa', 'mod_raporte', 'pagese', 'levizje_kartele', 'rregullim_gjendjeje', 'piket', 'sheh_koston', 'blerje_regjistro'],
   },
   magazinier: {
     label: 'Magazinier',
-    lejet: ['mod_artikujt', 'mod_blerje', 'mod_inventari', 'artikuj_ndrysho', 'sheh_koston'],
+    lejet: ['mod_artikujt', 'mod_blerje', 'mod_inventari', 'artikuj_ndrysho', 'sheh_koston', 'blerje_regjistro', 'inventar_rregullim'],
   },
   personalizuar: { label: 'I personalizuar', lejet: [] },
 }

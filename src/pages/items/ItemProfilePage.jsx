@@ -12,6 +12,8 @@ import { formatDate } from '../../utils/date'
 import ItemFormModal from './ItemFormModal'
 import ItemPricesSection from './ItemPricesSection'
 import ItemSales from './ItemSales'
+import ItemMovements from './ItemMovements'
+import { watchStock } from '../../services/stockService'
 
 const TABS = [
   ['detajet', 'Detajet'],
@@ -31,6 +33,8 @@ export default function ItemProfilePage() {
 
   const { data: item, loading, error } = useLive((ok, ko) => watchItem(id, ok, ko), [id])
   const { data: cost } = useLive((ok, ko) => watchItemCost(id, ok, ko), [id], { enabled: showCost })
+  const { data: stock } = useLive(watchStock, [], { initial: {} })
+  const stockQty = stock[id] ?? 0
 
   if (loading) return <div className="card muted">Duke u ngarkuar…</div>
   if (error) return <div className="alert error">{errorMessage(error)}</div>
@@ -85,7 +89,11 @@ export default function ItemProfilePage() {
               sub={margin != null ? `${Math.round((margin * 1000) / item.cmimi) / 10}% e çmimit` : 'Vendosni koston'}
             />
           )}
-          <Stat label="Stoku" value="—" sub="Llogaritet nga Inventari (Faza 4)" />
+          <Stat
+            label="Stoku"
+            value={`${stockQty} ${item.njesia}`}
+            sub={item.stokMinimal > 0 && stockQty < item.stokMinimal ? `⚠ Nën minimumin (${item.stokMinimal})` : 'Hyrje − dalje ± rregullime'}
+          />
         </div>
       </div>
 
@@ -120,9 +128,7 @@ export default function ItemProfilePage() {
         </>
       )}
       {tab === 'shitjet' && <ItemSales item={item} />}
-      {tab === 'stoku' && (
-        <Placeholder title="Lëvizjet e stokut" text="Nga Faza 4: hyrjet, daljet dhe rregullimet e inventarit për këtë artikull." />
-      )}
+      {tab === 'stoku' && <ItemMovements item={item} />}
 
       {editing && (
         <ItemFormModal item={item} cost={cost ?? undefined} showCost={showCost} onClose={() => setEditing(false)} />
@@ -146,15 +152,6 @@ function Detail({ label, value }) {
     <div className="detail">
       <div className="detail-label">{label}</div>
       <div className="detail-value">{value || '—'}</div>
-    </div>
-  )
-}
-
-function Placeholder({ title, text }) {
-  return (
-    <div className="card center placeholder">
-      <h3>{title}</h3>
-      <p className="muted">{text}</p>
     </div>
   )
 }

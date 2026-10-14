@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
 import { useSettings } from '../../hooks/useSettings'
 import { watchItems, watchItemCosts } from '../../services/itemService'
+import { watchStock } from '../../services/stockService'
 import { errorMessage } from '../../services/authService'
 import { canSeeCost } from '../../config/roles'
 import { canEditItems } from '../../config/ledger'
@@ -21,6 +22,7 @@ export default function ItemsPage() {
   const editable = canEditItems(perms)
   const { data: items, loading, error } = useLive(watchItems, [], { initial: [] })
   const { data: costs } = useLive(watchItemCosts, [], { enabled: showCost, initial: {} })
+  const { data: stock } = useLive(watchStock, [], { initial: {} })
   const [q, setQ] = useState('')
   const [kat, setKat] = useState('')
   const [nen, setNen] = useState('')
@@ -100,7 +102,7 @@ export default function ItemsPage() {
                   <td>{i.njesia}</td>
                   <td className="num">{formatMoney(i.cmimi, 'LEK')}</td>
                   {showCost && <td className="num">{costs[i.id] != null ? formatMoney(costs[i.id], 'LEK') : <span className="muted">—</span>}</td>}
-                  <td className="num muted" title="Stoku llogaritet nga Inventari (Faza 4)">—</td>
+                  <td className={`num ${(stock[i.id] ?? 0) < 0 || (i.stokMinimal > 0 && (stock[i.id] ?? 0) < i.stokMinimal) ? 'neg' : ''}`}>{stock[i.id] ?? 0}</td>
                   <td className="num">{i.stokMinimal || ''}</td>
                 </tr>
               ))}

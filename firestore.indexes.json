@@ -1,11 +1,131 @@
 {
   "indexes": [
-    { "collectionGroup": "invoices", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "clientId", "order": "ASCENDING" }, { "fieldPath": "data", "order": "DESCENDING" } ] },
-    { "collectionGroup": "invoices", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "statusi", "order": "ASCENDING" }, { "fieldPath": "data", "order": "DESCENDING" } ] },
-    { "collectionGroup": "invoices", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "monedha", "order": "ASCENDING" }, { "fieldPath": "data", "order": "DESCENDING" } ] },
-    { "collectionGroup": "invoices", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "clientId", "order": "ASCENDING" }, { "fieldPath": "totali", "order": "DESCENDING" } ] },
-    { "collectionGroup": "invoices", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "statusi", "order": "ASCENDING" }, { "fieldPath": "totali", "order": "DESCENDING" } ] },
-    { "collectionGroup": "invoices", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "monedha", "order": "ASCENDING" }, { "fieldPath": "totali", "order": "DESCENDING" } ] }
+    {
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "clientId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "data",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "statusi",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "data",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "monedha",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "data",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "clientId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "totali",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "statusi",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "totali",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "monedha",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "totali",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "purchases",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "furnitorId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "data",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "purchases",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "statusi",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "data",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "stockMovements",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "tipi",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "krijuar",
+          "order": "DESCENDING"
+        }
+      ]
+    }
   ],
   "fieldOverrides": []
 }

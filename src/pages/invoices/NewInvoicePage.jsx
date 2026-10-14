@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { getDoc } from 'firebase/firestore'
-import { Trash2, UserPlus, Save, Send, FileText } from 'lucide-react'
+import { Trash2, UserPlus, Save, Send, FileText, AlertTriangle } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
 import { useSettings } from '../../hooks/useSettings'
 import { watchClients } from '../../services/clientService'
 import { watchItems, watchPricesForClient } from '../../services/itemService'
 import { saveDraft, deleteDraft, issueInvoice, watchDrafts } from '../../services/invoiceService'
+import { watchStock } from '../../services/stockService'
 import { companyDoc } from '../../services/paths'
 import { rateFor } from '../../services/ledgerService'
 import { errorMessage } from '../../services/authService'
@@ -38,6 +39,7 @@ export default function NewInvoicePage() {
   const { data: clients } = useLive(watchClients, [], { initial: [] })
   const { data: items } = useLive(watchItems, [], { initial: [] })
   const { data: drafts } = useLive(watchDrafts, [], { initial: [] })
+  const { data: stock } = useLive(watchStock, [], { initial: {} })
 
   const [clientId, setClientId] = useState('')
   const [monedha, setMonedha] = useState('LEK')
@@ -140,6 +142,10 @@ export default function NewInvoicePage() {
     return { ...l, sasiaN: sasia, cmimi, ok, totali: ok ? sasia * cmimi : 0 }
   })
   const totali = parsed.reduce((s, l) => s + l.totali, 0)
+  // Paralajmërim (jo bllokim) kur sasia e faturës kalon stokun
+  const qtyByItem = {}
+  for (const l of parsed) if (l.ok) qtyByItem[l.itemId] = (qtyByItem[l.itemId] ?? 0) + l.sasiaN
+  const overStock = (itemId) => (qtyByItem[itemId] ?? 0) > (stock[itemId] ?? 0)
 
   // ---------- Gjendja / pagesa ----------
   const gjAuto = client?.gjendje?.[monedha] ?? 0
@@ -271,10 +277,10 @@ export default function NewInvoicePage() {
         .map((i) => ({
           id: i.id,
           label: `${i.kodi} – ${i.emri}`,
-          sub: prefs[i.id] != null ? `${formatMoney(prefs[i.id], 'LEK')} (preferencial)` : formatMoney(i.cmimi, 'LEK'),
+          sub: `${prefs[i.id] != null ? `${formatMoney(prefs[i.id], 'LEK')} (preferencial)` : formatMoney(i.cmimi, 'LEK')} · stoku ${stock[i.id] ?? 0}`,
           search: [i.kodi, i.emri, i.kategoria],
         })),
-    [items, prefs],
+    [items, prefs, stock],
   )
 
   return (
@@ -354,6 +360,9 @@ export default function NewInvoicePage() {
                       </div>
                     )}
                     {!l.manual && prefs[l.itemId] != null && <div className="small muted">Çmim preferencial</div>}
+                    {overStock(l.itemId) && (
+                      <div className="small stock-warn"><AlertTriangle size={12} /> Stoku: {stock[l.itemId] ?? 0} {l.njesia} – sasia e faturës e kalon</div>
+                    )}
                   </td>
                   <td className="num">
                     <input className="qty-input" type="number" min={1} step={1} value={l.sasia} onChange={(e) => updateLine(l.key, { sasia: e.target.value })} />

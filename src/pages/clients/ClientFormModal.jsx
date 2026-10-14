@@ -19,10 +19,10 @@ const TEXT_FIELDS = [
 ]
 
 /** Krijim / ndryshim klienti. Te krijimi, Admin/Financë mund të vendosin edhe gjendjen fillestare. */
-export default function ClientFormModal({ client, onClose, onSaved }) {
+export default function ClientFormModal({ client, onClose, onSaved, defaultType }) {
   const { perms, profile } = useAuth()
   const { settings } = useSettings()
-  const [form, setForm] = useState(() => ({ ...EMPTY_CLIENT, ...(client ?? {}) }))
+  const [form, setForm] = useState(() => ({ ...EMPTY_CLIENT, ...(defaultType ? { tipi: defaultType } : {}), ...(client ?? {}) }))
   const [initial, setInitial] = useState({ shuma: '', monedha: 'LEK', data: toInputDate() })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
