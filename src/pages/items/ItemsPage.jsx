@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
@@ -14,6 +15,7 @@ import ItemFormModal from './ItemFormModal'
 
 export default function ItemsPage() {
   const { perms } = useAuth()
+  const navigate = useNavigate()
   const { settings } = useSettings()
   const showCost = canSeeCost(perms)
   const editable = canEditItems(perms)
@@ -23,7 +25,7 @@ export default function ItemsPage() {
   const [kat, setKat] = useState('')
   const [nen, setNen] = useState('')
   const [showArchived, setShowArchived] = useState(false)
-  const [editing, setEditing] = useState(null) // null | 'new' | item
+  const [creating, setCreating] = useState(false)
 
   const categories = settings.kategorite.artikuj
   const subcats = categories.find((c) => c.emri === kat)?.nen ?? []
@@ -45,7 +47,7 @@ export default function ItemsPage() {
       <div className="page-head">
         <h1 className="page-title">Artikujt</h1>
         {editable && (
-          <button className="btn primary" onClick={() => setEditing('new')}>
+          <button className="btn primary" onClick={() => setCreating(true)}>
             <Plus size={16} /> Artikull i ri
           </button>
         )}
@@ -88,7 +90,7 @@ export default function ItemsPage() {
               {loading && <tr><td colSpan={8} className="muted">Duke u ngarkuar…</td></tr>}
               {!loading && !paged.rows.length && <tr><td colSpan={8} className="muted">Asnjë artikull.</td></tr>}
               {paged.rows.map((i) => (
-                <tr key={i.id} onClick={() => setEditing(i)} className={i.arkivuar ? 'archived' : ''}>
+                <tr key={i.id} onClick={() => navigate(`/artikujt/${i.id}`)} className={i.arkivuar ? 'archived' : ''}>
                   <td className="mono">{i.kodi}</td>
                   <td>
                     <b>{i.emri}</b>
@@ -108,13 +110,11 @@ export default function ItemsPage() {
         <Pagination paged={paged} />
       </div>
 
-      {editing && (
+      {creating && (
         <ItemFormModal
-          item={editing === 'new' ? null : editing}
-          cost={editing !== 'new' ? costs[editing.id] : undefined}
-          readOnly={!editable}
           showCost={showCost}
-          onClose={() => setEditing(null)}
+          onClose={() => setCreating(false)}
+          onSaved={(id) => navigate(`/artikujt/${id}`)}
         />
       )}
     </div>

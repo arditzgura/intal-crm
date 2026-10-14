@@ -8,6 +8,7 @@ import { watchClientLedger } from '../../services/ledgerService'
 import { errorMessage } from '../../services/authService'
 import { CLIENT_TYPES, canEditClients, canLedger, canAdjustPoints, OTHER_MOVEMENTS } from '../../config/ledger'
 import { CURRENCIES, formatMoney } from '../../utils/money'
+import { canSeeCost } from '../../config/roles'
 import { formatDate, millis } from '../../utils/date'
 import Balance from '../../components/Balance'
 import ClientFormModal from './ClientFormModal'
@@ -22,6 +23,7 @@ const TABS = [
   ['kartela', 'Kartela'],
   ['pagesat', 'Pagesat'],
   ['faturat', 'Faturat'],
+  ['blerjet', 'Artikujt e blerë'],
   ['piket', 'Pikët'],
   ['cmimet', 'Çmimet preferenciale'],
 ]
@@ -139,6 +141,15 @@ export default function ClientProfilePage() {
         <div className="card center placeholder">
           <h3>Faturat</h3>
           <p className="muted">Faturat e klientit shfaqen këtu nga Faza 3.</p>
+        </div>
+      )}
+      {tab === 'blerjet' && (
+        <div className="card center placeholder">
+          <h3>Artikujt e blerë</h3>
+          <p className="muted">
+            Nga Faza 3: çdo artikull që ka blerë klienti, me sasinë, çmimin mesatar, totalin
+            {canSeeCost(perms) ? ' dhe fitimin' : ''}, si dhe blerjet totale sipas periudhës.
+          </p>
         </div>
       )}
       {tab === 'piket' && (

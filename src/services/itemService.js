@@ -56,6 +56,19 @@ export function watchItems(onData, onError) {
   )
 }
 
+export function watchItem(id, onData, onError) {
+  return onSnapshot(
+    companyDoc('items', id),
+    (snap) => onData(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+    onError,
+  )
+}
+
+/** Kosto e një artikulli (vetëm me lejen "sheh_koston"). */
+export function watchItemCost(id, onData, onError) {
+  return onSnapshot(companyDoc('itemCosts', id), (snap) => onData(snap.exists() ? snap.data().kosto : null), onError)
+}
+
 /** Kostot (vetëm për rolet që i lejon Rules). Kthen { itemId: kosto }. */
 export function watchItemCosts(onData, onError) {
   return onSnapshot(

@@ -13,6 +13,7 @@ import SettingsPage from './pages/settings/SettingsPage'
 import ClientsPage from './pages/clients/ClientsPage'
 import ClientProfilePage from './pages/clients/ClientProfilePage'
 import ItemsPage from './pages/items/ItemsPage'
+import ItemProfilePage from './pages/items/ItemProfilePage'
 import { errorMessage } from './services/authService'
 
 const PAGES = {
@@ -79,6 +80,14 @@ export default function App() {
             element={
               <ProtectedRoute moduleKey="kliente">
                 <ClientProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/artikujt/:id"
+            element={
+              <ProtectedRoute moduleKey="artikujt">
+                <ItemProfilePage />
               </ProtectedRoute>
             }
           />
