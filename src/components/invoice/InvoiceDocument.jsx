@@ -1,6 +1,6 @@
 import { forwardRef } from 'react'
 import { formatMoney } from '../../utils/money'
-import { formatDate } from '../../utils/date'
+import { formatDate, toDate } from '../../utils/date'
 
 /**
  * Pamja e printueshme e faturës. format: 'a4' | 'termik'.
@@ -19,6 +19,10 @@ const InvoiceDocument = forwardRef(function InvoiceDocument({ invoice, settings,
   const numri = invoice.numriTekst ?? (isDraft ? 'DRAFT' : invoice.numri)
   const itemStyle = { fontFamily: f.fonti, fontSize: `${f.madhesiaFontit}px` }
   const k1 = invoice.klient ?? {}
+
+  if (format === 'a4' && (f.shablloni ?? 'klasik') === 'klasik') {
+    return <IntalA4 ref={ref} invoice={invoice} settings={settings} />
+  }
 
   if (format === 'termik') {
     return (
@@ -204,5 +208,133 @@ function ThermalRow({ label, value, bold }) {
     </div>
   )
 }
+
+/** Shablloni kryesor (si fatura e sistemit të vjetër INTAL). */
+const IntalA4 = forwardRef(function IntalA4({ invoice, settings }, ref) {
+  const k = settings.kompania
+  const f = settings.fatura
+  const L = settings.etiketat
+  const cur = invoice.monedha
+  const sym = cur === 'LEK' ? 'L' : cur === 'EUR' ? '€' : '$'
+  const word = cur === 'LEK' ? 'LEKË' : cur
+  const m = (v) => formatMoney(v ?? 0)
+  const isDraft = invoice.statusi === 'draft'
+  const cancelled = invoice.statusi === 'anuluar'
+  const gjendjaRe = invoice.gjendjaRe ?? invoice.totali ?? 0
+  const numri = invoice.numriTekst ?? (isDraft ? 'DRAFT' : invoice.numri)
+  const k1 = invoice.klient ?? {}
+  const time = toDate(invoice.leshuar ?? invoice.krijuar)
+  const itemStyle = { fontFamily: f.fonti, fontSize: `${f.madhesiaFontit}px` }
+  const debtLabel = gjendjaRe < 0 ? L.teprica : L.detyrimi
+
+  return (
+    <div ref={ref} className="inv inv-a4 tpl-intal">
+      {k.logo && f.watermarkMadhesia > 0 && (
+        <img src={k.logo} alt="" className="inv-watermark" style={{ width: `${f.watermarkMadhesia}%`, opacity: f.watermarkTransparenca / 100 }} />
+      )}
+      {cancelled && <div className="inv-stamp">ANULUAR</div>}
+      {isDraft && <div className="inv-stamp draft">DRAFT</div>}
+
+      <header className="ti-head">
+        <div className="ti-company">
+          {k.logo ? <img src={k.logo} alt="" className="ti-logo" /> : <div className="ti-name">{k.emri}</div>}
+          {k.slogani && <div className="ti-slogan">{k.slogani}</div>}
+          <div className="ti-lines">
+            {k.adresa && <div>{k.adresa}</div>}
+            {k.telefoni && <div>Tel: {k.telefoni}</div>}
+            {k.website && <div>{k.website}</div>}
+            {k.nipt && <div>NIPT: {k.nipt}</div>}
+          </div>
+        </div>
+        <div className="ti-right">
+          <div className="ti-title">{L.fatura}</div>
+          <div className="ti-meta">
+            <b>NR. {numri}</b>
+            <span>DATA: {formatDate(invoice.data)}</span>
+            {time && <span>ORA: {String(time.getHours()).padStart(2, '0')}:{String(time.getMinutes()).padStart(2, '0')}</span>}
+          </div>
+        </div>
+      </header>
+
+      <section className="ti-client-row">
+        <div className="ti-client">
+          <div className="ti-client-label">{L.klienti}:</div>
+          <div className="ti-client-name">{k1.emri}</div>
+          {k1.qyteti && <div className="ti-client-city">{k1.qyteti}</div>}
+          {k1.telefoni && <div className="ti-client-city">{k1.telefoni}</div>}
+        </div>
+        {!isDraft && (
+          <div className="ti-pills">
+            <div className={`ti-debt ${gjendjaRe < 0 ? 'credit' : ''}`}>
+              <span>{debtLabel}</span>
+              <b>{m(Math.abs(gjendjaRe))} {word}</b>
+            </div>
+            {invoice.piketKlientit != null && (
+              <div className="ti-points">★ PIKËT: <b>{invoice.piketKlientit}</b></div>
+            )}
+          </div>
+        )}
+      </section>
+
+      <table className="ti-items" style={itemStyle}>
+        <thead>
+          <tr>
+            <th>{L.artikulli}</th>
+            <th className="c">{L.sasia}</th>
+            <th className="c">{L.cmimi}</th>
+            <th className="r">{L.totali}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {invoice.rreshtat.map((r, i) => (
+            <tr key={i}>
+              <td className="ti-item-name">{r.emri}</td>
+              <td className="c">{r.sasia}</td>
+              <td className="c ti-price">{r.cmimiOrigjinal != null && <s>{m(r.cmimiOrigjinal)}</s>} {m(r.cmimi)} {sym}</td>
+              <td className="r"><b>{m(r.totali)} {sym}</b></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div className="ti-bottom">
+        <div className="ti-left">
+          {invoice.shenime && (
+            <div className="ti-notes">
+              <div className="ti-notes-label">Shënime:</div>
+              <div className="ti-notes-text">{invoice.shenime}</div>
+            </div>
+          )}
+          {k.instagram && (
+            <div className="ti-insta">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" /></svg>
+              {k.instagram.startsWith('@') ? k.instagram : `@${k.instagram}`}
+            </div>
+          )}
+          {(k.banka || k.iban) && <div className="ti-bank">{[k.banka, k.iban && `IBAN: ${k.iban}`].filter(Boolean).join(' · ')}</div>}
+        </div>
+        <div className="ti-totals">
+          <div className="ti-row"><span>{L.nentotali}:</span><b>{m(invoice.nentotali ?? invoice.totali)} {sym}</b></div>
+          {!isDraft && invoice.gjendjaPara !== 0 && invoice.gjendjaPara != null && (
+            <div className="ti-row"><span>{L.gjendja} (+):</span><b>{m(invoice.gjendjaPara)} {sym}</b></div>
+          )}
+          {!isDraft && invoice.paguar > 0 && (
+            <div className="ti-row"><span>{L.paguar} (−):</span><b>{m(invoice.paguar)} {sym}</b></div>
+          )}
+          {!isDraft && (
+            <div className={`ti-row ti-final ${gjendjaRe < 0 ? 'credit' : ''}`}>
+              <span>{debtLabel}:</span><b>{m(Math.abs(gjendjaRe))} {word}</b>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <footer className="ti-foot">
+        <div className="ti-thanks">{L.falenderim}</div>
+        {L.besnikeria && <div className="ti-loyalty">{L.besnikeria}</div>}
+      </footer>
+    </div>
+  )
+})
 
 export default InvoiceDocument

@@ -18,6 +18,7 @@ import { formatMoney } from '../../utils/money'
 import { formatDate, formatDateTime, fromInputDate, periodLabel, periodRange, toInputDate } from '../../utils/date'
 import { StatusBadge, ACTION_LABELS, CancelModal } from './InvoiceViewPage'
 import Modal from '../../components/Modal'
+import InvoicePreview from '../../components/invoice/InvoicePreview'
 
 
 export default function HistoryPage() {
@@ -59,6 +60,7 @@ export function InvoiceList({ fixedClientId }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [report, setReport] = useState(false)
+  const [preview, setPreview] = useState(null)
 
   const range = useMemo(() => periodRange(period), [period])
   const label = periodLabel(period)
@@ -155,6 +157,7 @@ export function InvoiceList({ fixedClientId }) {
       {!fixedClientId && <SummaryBar range={range} label={label} items={items} reloadKey={reloadKey} />}
       {error && <div className="alert error">{error}</div>}
 
+      {preview && <InvoicePreview invoice={preview} onClose={() => setPreview(null)} />}
       {report && <ReportModal target={target} filters={baseFilters} label={label} onClose={() => setReport(false)} />}
 
       <div className="card no-pad">
@@ -178,7 +181,7 @@ export function InvoiceList({ fixedClientId }) {
               {!loading && !rows.length && <tr><td colSpan={9} className="muted">Asnjë faturë.</td></tr>}
               {!loading && rows.map((r) => {
                 const isDraft = r.statusi === 'draft'
-                const open = () => navigate(isDraft ? `/fature-e-re?draft=${r.id}` : `/fatura/${r.id}`)
+                const open = () => (isDraft ? navigate(`/fature-e-re?draft=${r.id}`) : setPreview(r))
                 return (
                   <tr key={r.id} onClick={open} className={r.statusi === 'anuluar' ? 'archived' : ''}>
                     <td className="mono">
@@ -209,9 +212,6 @@ export function InvoiceList({ fixedClientId }) {
                       )}
                       {isDraft && perms.has('fature_leshim') && (
                         <button className="icon-btn danger-text" title="Fshi draftin" onClick={() => onDeleteDraft(r)}><Trash2 size={17} /></button>
-                      )}
-                      {!isDraft && r.statusi !== 'anuluar' && perms.has('anulim_fature') && (
-                        <button className="icon-btn danger-text" title="Anulo faturën" onClick={() => setModal({ type: 'anulo', inv: r })}><Trash2 size={17} /></button>
                       )}
                     </td>
                   </tr>

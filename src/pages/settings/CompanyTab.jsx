@@ -13,6 +13,7 @@ const FIELDS = [
   ['slogani', 'Slogani'],
   ['banka', 'Banka'],
   ['iban', 'IBAN'],
+  ['instagram', 'Instagram (p.sh. @intalalbania)'],
 ]
 
 export default function CompanyTab() {

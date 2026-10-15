@@ -186,6 +186,7 @@ export async function issueInvoice(draftId, data, actorName) {
       faturaPara: prev?.id ?? null,
       faturaPas: null,
       piketDhene: pts.per[ref.id] ?? 0,
+      piketKlientit: client.rastesor ? null : Math.max(0, (client.piket ?? 0) + pts.total),
       shenime: (data.shenime ?? '').trim(),
       krijuar: draft?.krijuar ?? serverTimestamp(),
       krijuarNga: draft?.krijuarNga ?? { uid, emri: actorName ?? '' },
@@ -546,6 +547,11 @@ export async function invoiceProfit(range, itemIds, costs) {
     }))
   }
   return profit
+}
+
+/** Numri i radhës së faturës (vetëm për shfaqje; numri jepet në lëshim). */
+export function watchNextInvoiceNumber(onData, onError) {
+  return onSnapshot(companyDoc('counters', 'invoices'), (s) => onData(s.exists() ? s.data().next : 1), onError)
 }
 
 export function watchDrafts(onData, onError) {

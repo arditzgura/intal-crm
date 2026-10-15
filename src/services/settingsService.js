@@ -19,10 +19,12 @@ export const INVOICE_LABELS = [
   ['detyrimi', 'DETYRIMI'],
   ['teprica', 'TEPRICA'],
   ['falenderim', 'FALEMINDERIT QË NA BESUAT!'],
+  ['besnikeria', 'RAPORTI I BESNIKËRISË: BLERJET GRUMBULLOJNË PIKË QË MUND TË PËRDOREN SI ZBRITJE NË TË ARDHMEN.'],
 ]
 
 export const INVOICE_TEMPLATES = [
-  { value: 'klasik', label: 'Klasik' },
+  { value: 'klasik', label: 'Klasik (INTAL)' },
+  { value: 'standard', label: 'Standard' },
   { value: 'modern', label: 'Modern' },
   { value: 'minimal', label: 'Minimal' },
 ]
@@ -43,6 +45,7 @@ export const DEFAULT_SETTINGS = {
     banka: '',
     iban: '',
     logo: '', // base64 data URL, max ~200 KB
+    instagram: '@intalalbania',
   },
   fatura: {
     shablloni: 'klasik',
