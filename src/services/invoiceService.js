@@ -1,4 +1,5 @@
 import {
+  count, documentId, getAggregateFromServer, sum,
   getDoc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp,
   startAfter, where, writeBatch,
 } from 'firebase/firestore'
@@ -443,6 +444,7 @@ export async function queryInvoices(filters = {}, cursor = null) {
     return { rows, cursor: null, more: false }
   }
   if (filters.clientId) cons.push(where('clientId', '==', filters.clientId))
+  if (filters.clientIds?.length) cons.push(where('clientId', 'in', filters.clientIds.slice(0, 30)))
   if (filters.statusi) cons.push(where('statusi', '==', filters.statusi))
   if (filters.monedha) cons.push(where('monedha', '==', filters.monedha))
   const byAmount = filters.min != null || filters.max != null
@@ -455,6 +457,11 @@ export async function queryInvoices(filters = {}, cursor = null) {
     if (filters.to) cons.push(where('data', '<=', filters.to))
     cons.push(orderBy('data', 'desc'))
   }
+  if (filters.all) {
+    // Pa faqe (p.sh. për raportin): të gjitha faturat e filtrit, max 5000.
+    const snap = await getDocs(query(col, ...cons, limit(5000)))
+    return { rows: snap.docs.map((d) => ({ id: d.id, ...d.data() })), cursor: null, more: false }
+  }
   if (cursor) cons.push(startAfter(cursor))
   cons.push(limit(PAGE + 1))
   const snap = await getDocs(query(col, ...cons))
@@ -465,6 +472,80 @@ export async function queryInvoices(filters = {}, cursor = null) {
     rows = rows.filter((r) => (!filters.from || millis(r.data) >= filters.from.getTime()) && (!filters.to || millis(r.data) <= filters.to.getTime()))
   }
   return { rows, cursor: docs[docs.length - 1] ?? null, more: snap.docs.length > PAGE }
+}
+
+const rangeCons = ({ from, to } = {}) => [...(from ? [where('data', '>=', from)] : []), ...(to ? [where('data', '<=', to)] : [])]
+
+/** Id-të e faturave (më e reja e para) që përmbajnë një nga artikujt (max 30). */
+export async function invoiceIdsForItems(itemIds, range) {
+  if (!itemIds.length) return []
+  const snap = await getDocs(query(companyCol('invoiceLines'), where('itemId', 'in', itemIds.slice(0, 30)), ...rangeCons(range), orderBy('data', 'desc'), limit(3000)))
+  const seen = new Set()
+  const ids = []
+  for (const d of snap.docs) {
+    const id = d.data().invoiceId
+    if (!seen.has(id)) {
+      seen.add(id)
+      ids.push(id)
+    }
+  }
+  return ids
+}
+
+/** Faturat sipas id-ve, në të njëjtin rend. */
+export async function invoicesByIds(ids) {
+  const out = new Map()
+  for (let i = 0; i < ids.length; i += 30) {
+    const chunk = ids.slice(i, i + 30)
+    const snap = await getDocs(query(companyCol('invoices'), where(documentId(), 'in', chunk)))
+    snap.docs.forEach((d) => out.set(d.id, { id: d.id, ...d.data() }))
+  }
+  return ids.map((id) => out.get(id)).filter(Boolean)
+}
+
+/**
+ * Përmbledhja e periudhës, e llogaritur nga serveri (sum / count) pa lexuar faturat:
+ * numri i faturave, shitjet, arkëtimet (pagesat e klientëve) dhe borxhi i papaguar,
+ * secila sipas monedhës. Faturat e anuluara dhe draftet nuk përfshihen.
+ */
+export async function invoiceSummary(range) {
+  const out = { count: 0, sales: {}, receipts: {}, unpaid: {}, receiptsError: false }
+  await Promise.all(['LEK', 'EUR', 'USD'].map(async (cur) => {
+    const inv = companyCol('invoices')
+    const [a, b] = await Promise.all([
+      getAggregateFromServer(query(inv, where('monedha', '==', cur), where('statusi', 'in', ISSUED), ...rangeCons(range)), { n: count(), s: sum('totali') }),
+      getAggregateFromServer(query(inv, where('monedha', '==', cur), where('statusi', '==', 'pa_paguar'), ...rangeCons(range)), { s: sum('mbetur') }),
+    ])
+    out.count += a.data().n
+    if (a.data().s) out.sales[cur] = a.data().s
+    if (b.data().s) out.unpaid[cur] = b.data().s
+    try {
+      const c = await getAggregateFromServer(query(companyCol('ledger'), where('tipi', '==', 'pagese'), where('monedha', '==', cur), ...rangeCons(range)), { s: sum('shuma') })
+      if (c.data().s) out.receipts[cur] = -c.data().s
+    } catch {
+      out.receiptsError = true
+    }
+  }))
+  return out
+}
+
+/**
+ * Fitimi i periudhës (LEK) me koston aktuale të artikujve: Σ (shitja − sasia × kosto),
+ * me sum-e nga serveri për çdo artikull që ka kosto.
+ */
+export async function invoiceProfit(range, itemIds, costs) {
+  let profit = 0
+  const withCost = itemIds.filter((id) => costs[id] != null)
+  for (let i = 0; i < withCost.length; i += 20) {
+    await Promise.all(withCost.slice(i, i + 20).map(async (itemId) => {
+      const r = await getAggregateFromServer(
+        query(companyCol('invoiceLines'), where('itemId', '==', itemId), where('monedha', '==', 'LEK'), where('anuluar', '==', false), ...rangeCons(range)),
+        { t: sum('totali'), q: sum('sasia') },
+      )
+      profit += (r.data().t ?? 0) - (r.data().q ?? 0) * costs[itemId]
+    }))
+  }
+  return profit
 }
 
 export function watchDrafts(onData, onError) {

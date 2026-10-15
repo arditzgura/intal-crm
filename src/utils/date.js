@@ -44,3 +44,47 @@ export function formatDateTime(value) {
 }
 
 export const millis = (value) => toDate(value)?.getTime() ?? 0
+
+const MONTHS = ['Janar', 'Shkurt', 'Mars', 'Prill', 'Maj', 'Qershor', 'Korrik', 'Gusht', 'Shtator', 'Tetor', 'Nëntor', 'Dhjetor']
+
+/**
+ * Periudha e filtrit: { kind: 'all' | 'day' | 'date' | 'month' | 'year', date: 'YYYY-MM-DD', month: 'YYYY-MM', year: 'YYYY' }
+ * → { from, to } (Date ose null).
+ */
+export function periodRange(p) {
+  switch (p.kind) {
+    case 'day': {
+      const t = toInputDate()
+      return { from: startOfDay(t), to: endOfDay(t) }
+    }
+    case 'date':
+      return p.date ? { from: startOfDay(p.date), to: endOfDay(p.date) } : { from: null, to: null }
+    case 'month': {
+      const [y, m] = (p.month || '').split('-').map(Number)
+      return y ? { from: new Date(y, m - 1, 1), to: new Date(y, m, 0, 23, 59, 59, 999) } : { from: null, to: null }
+    }
+    case 'year': {
+      const y = Number(p.year)
+      return y ? { from: new Date(y, 0, 1), to: new Date(y, 11, 31, 23, 59, 59, 999) } : { from: null, to: null }
+    }
+    default:
+      return { from: null, to: null }
+  }
+}
+
+export function periodLabel(p) {
+  switch (p.kind) {
+    case 'day':
+      return `Sot, ${formatDate(new Date())}`
+    case 'date':
+      return p.date ? formatDate(startOfDay(p.date)) : '—'
+    case 'month': {
+      const [y, m] = (p.month || '').split('-').map(Number)
+      return y ? `${MONTHS[m - 1]} ${y}` : '—'
+    }
+    case 'year':
+      return p.year || '—'
+    default:
+      return 'Gjithë kohës'
+  }
+}
