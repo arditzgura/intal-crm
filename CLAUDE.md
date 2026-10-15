@@ -51,6 +51,11 @@ React + Vite, HashRouter, Firebase (vetëm Auth email/fjalëkalim + Firestore). 
 - `expenses` dhe `supplierPayments` nuk fshihen: anulohen me arsye (lëvizja e kundërt në arkë). Pagesa e furnitorit ul `detyrimFurnitori` përmes `supplierLedger`.
 - Anulimi i faturës me pagesë: `kthePagesen` → paratë dalin nga arka; përndryshe klienti mbetet me tepricë.
 - Raportet (`pages/reports`) lexojnë `invoiceLines` sipas periudhës; borxhet sipas vjetërsisë ndajnë borxhin aktual nga fatura më e re drejt së vjetrës.
+
+## Struktura (Faza 6)
+- Importi: `services/importService.js` → `buildImportPlan` (lista e rregullt shkrimesh me ID deterministe nga id-të e vjetra + raporti) dhe `runImport` (batch 450; progresi te `companies/{c}/meta/import` në të njëjtin batch → vazhdon pas kuotës ditore pa dublikata).
+- Rules: "mënyra e importit" (`meta/import.aktiv`, vetëm Admin) lejon shkrimin e dokumenteve historike; mbyllet pas importit.
+- Projekti i provës: `.env.test` (VITE_* e projektit test) + `npm run dev:test`; Rules publikohen me `--project <id-test>`.
 - Rules dhe indekset publikohen me `npx firebase-tools deploy --only firestore` (pyet para çdo deploy-i).
 - Repo në GitHub: `intal-crm` (`base: '/intal-crm/'`). Repo-ja `intal-pro` është sistemi i vjetër – mos e prek.
 

@@ -53,6 +53,7 @@ export default function InvoiceLookTab() {
             {INVOICE_FONTS.map((f) => (
               <option key={f} value={f}>{f}</option>
             ))}
+            {d.fonti && !INVOICE_FONTS.includes(d.fonti) && <option value={d.fonti}>{d.fonti}</option>}
           </select>
         </label>
         <NumberField label="Madhësia e fontit të artikujve" value={d.madhesiaFontit} min={8} max={24} suffix="px" onChange={(v) => form.update({ madhesiaFontit: v })} />

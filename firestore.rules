@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// INTAL PRO – Firestore Security Rules (Faza 1–5)
+// INTAL PRO – Firestore Security Rules (Faza 1–6)
 // Lejet e roleve zbatohen këtu, jo vetëm në UI. Çdo gjë që nuk lejohet
 // shprehimisht është e ndaluar.
 
@@ -240,6 +240,11 @@ service cloud.firestore {
                 && paymentAfter(companyId, d.refId).shuma == d.shuma)))
           || (d.tipi in ['transferte', 'gjendje_fillestare', 'rregullim'] && can(companyId, 'financa_arka'))
         );
+    }
+
+    function importing(companyId) {
+      return isAdmin(companyId)
+        && get(/databases/$(database)/documents/companies/$(companyId)/meta/import).data.aktiv == true;
     }
 
     function isDraft(d) { return d.statusi == 'draft' && d.numri == null; }
@@ -604,6 +609,21 @@ service cloud.firestore {
           && request.resource.data.clientId is string;
         allow update: if can(companyId, 'financa_furnitore') && moneyDocCancel();
         allow delete: if false;
+      }
+
+      // ---------- Importi (Faza 6) ----------
+      // Admini hap "mënyrën e importit" (meta/import.aktiv) vetëm gjatë importit të
+      // backup-it të vjetër. Atëherë mund të shkruajë dokumentet historike që nuk
+      // kalojnë rregullat normale (p.sh. "lëshuar tani"). Pas importit mbyllet.
+      match /meta/{docId} {
+        allow read, write: if isAdmin(companyId);
+      }
+      match /{collection}/{docId} {
+        allow create, update: if importing(companyId) && collection in [
+          'settings', 'clients', 'items', 'itemCodes', 'itemCosts', 'costHistory', 'preferentialPrices',
+          'purchases', 'purchaseNumbers', 'stockMovements', 'invoices', 'invoiceNumbers', 'invoiceLines',
+          'ledger', 'cashMovements', 'loyaltyPoints', 'stock', 'cashBalances', 'counters', 'auditLog'
+        ];
       }
 
       // Log-u i veprimeve: vetëm shtim, kurrë ndryshim ose fshirje.
