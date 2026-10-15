@@ -113,7 +113,7 @@ export default function ClientFormModal({ client, onClose, onSaved, defaultType 
             <div className="grid-3">
               <label className="field">
                 <span>Shuma</span>
-                <input inputMode="decimal" placeholder="0,00" value={initial.shuma} onChange={(e) => setInitial({ ...initial, shuma: e.target.value })} />
+                <input inputMode="decimal" placeholder="0" value={initial.shuma} onChange={(e) => setInitial({ ...initial, shuma: e.target.value })} />
               </label>
               <label className="field">
                 <span>Monedha</span>

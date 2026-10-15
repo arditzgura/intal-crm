@@ -17,15 +17,18 @@ export function parseMoney(text) {
   return parseScaled(text, 2)
 }
 
-/** 123456 → "1 234,56" */
+/**
+ * 594000 → "5,940"  ·  123456 → "1,234.56"
+ * Mijëshet me presje; qindarkat (me pikë) shfaqen vetëm kur nuk janë zero.
+ */
 export function formatMoney(minor, currency) {
   if (minor == null || Number.isNaN(minor)) return ''
   const sign = minor < 0 ? '-' : ''
   const abs = Math.abs(Math.trunc(minor))
   const whole = Math.floor(abs / 100)
-  const cents = String(abs % 100).padStart(2, '0')
-  const wholeStr = String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
-  const text = `${sign}${wholeStr},${cents}`
+  const cents = abs % 100
+  const wholeStr = String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  const text = cents ? `${sign}${wholeStr}.${String(cents).padStart(2, '0')}` : `${sign}${wholeStr}`
   return currency ? `${text} ${CURRENCIES[currency]?.label ?? currency}` : text
 }
 

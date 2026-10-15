@@ -52,7 +52,7 @@ function MoneyFields({ f, signed, hideAccount, amountLabel = 'Shuma' }) {
       )}
       <label className="field">
         <span>{amountLabel}{signed ? ' (me "-" për zbritje)' : ''}</span>
-        <input inputMode="decimal" placeholder="0,00" value={f.shumaText} onChange={(e) => f.setShumaText(e.target.value)} autoFocus required />
+        <input inputMode="decimal" placeholder="0" value={f.shumaText} onChange={(e) => f.setShumaText(e.target.value)} autoFocus required />
       </label>
       <label className="field">
         <span>Data</span>

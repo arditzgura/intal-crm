@@ -105,12 +105,12 @@ export default function ItemFormModal({ item, cost, showCost, onClose, onSaved }
             </label>
             <label className="field">
               <span>Çmimi i shitjes (LEK) *</span>
-              <input inputMode="decimal" placeholder="0,00" value={cmimi} onChange={(e) => setCmimi(e.target.value)} required />
+              <input inputMode="decimal" placeholder="0" value={cmimi} onChange={(e) => setCmimi(e.target.value)} required />
             </label>
             {showCost && (
               <label className="field">
                 <span>Çmimi i blerjes / kosto (LEK)</span>
-                <input inputMode="decimal" placeholder="0,00" value={kosto} onChange={(e) => setKosto(e.target.value)} />
+                <input inputMode="decimal" placeholder="0" value={kosto} onChange={(e) => setKosto(e.target.value)} />
               </label>
             )}
           </div>

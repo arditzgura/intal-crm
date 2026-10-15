@@ -146,7 +146,7 @@ export default function LedgerEntryModal({ mode, client, onClose }) {
                   ? 'Shuma (pozitive = detyrim, me "-" = tepricë)'
                   : 'Shuma'}
             </span>
-            <input inputMode="decimal" placeholder="0,00" value={shuma} onChange={(e) => setShuma(e.target.value)} autoFocus required />
+            <input inputMode="decimal" placeholder="0" value={shuma} onChange={(e) => setShuma(e.target.value)} autoFocus required />
           </label>
           <label className="field">
             <span>Data</span>

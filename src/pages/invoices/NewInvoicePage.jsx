@@ -436,7 +436,7 @@ export default function NewInvoicePage() {
               <input
                 className="price-input"
                 inputMode="decimal"
-                placeholder="0,00"
+                placeholder="0"
                 value={paguarText}
                 onChange={(e) => {
                   setPaguarText(e.target.value)
