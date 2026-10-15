@@ -5,10 +5,13 @@ import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
 import { watchClients } from '../../services/clientService'
 import { queryInvoices, queryAuditLog, deleteDraft, correctInvoice } from '../../services/invoiceService'
+import { addLedgerEntry, rateFor } from '../../services/ledgerService'
+import { PAYMENT_METHODS } from '../../config/ledger'
+import { useSettings } from '../../hooks/useSettings'
 import { STATUS_LABELS } from '../../services/invoiceChain'
 import { errorMessage } from '../../services/authService'
 import { CURRENCIES, formatMoney, parseMoney } from '../../utils/money'
-import { endOfDay, formatDate, formatDateTime, startOfDay } from '../../utils/date'
+import { endOfDay, formatDate, formatDateTime, fromInputDate, startOfDay, toInputDate } from '../../utils/date'
 import SearchPicker from '../../components/SearchPicker'
 import { StatusBadge, ACTION_LABELS, CancelModal } from './InvoiceViewPage'
 import Modal from '../../components/Modal'
@@ -156,13 +159,14 @@ export function InvoiceList({ fixedClientId }) {
                 <th className="num">Vlera e faturës</th>
                 <th className="num">Arkëtuar</th>
                 <th className="num">Detyrimi</th>
+                <th className="check-col" title="E paguar" />
                 <th>Statusi</th>
                 <th className="num">Veprime</th>
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={8} className="muted">Duke u ngarkuar…</td></tr>}
-              {!loading && !rows.length && <tr><td colSpan={8} className="muted">Asnjë faturë.</td></tr>}
+              {loading && <tr><td colSpan={9} className="muted">Duke u ngarkuar…</td></tr>}
+              {!loading && !rows.length && <tr><td colSpan={9} className="muted">Asnjë faturë.</td></tr>}
               {!loading && rows.map((r) => {
                 const isDraft = r.statusi === 'draft'
                 const open = () => navigate(isDraft ? `/fature-e-re?draft=${r.id}` : `/fatura/${r.id}`)
@@ -182,6 +186,9 @@ export function InvoiceList({ fixedClientId }) {
                     <td className="num"><b>{formatMoney(r.totali, r.monedha)}</b></td>
                     <td className="num pos">{isDraft ? '' : formatMoney(r.paguar, r.monedha)}</td>
                     <td className="num"><Debt r={r} /></td>
+                    <td className="check-col" onClick={(e) => e.stopPropagation()}>
+                      <PaidCheckbox r={r} canPay={perms.has('pagese')} onPay={() => setModal({ type: 'paguaj', inv: r })} />
+                    </td>
                     <td><StatusBadge statusi={r.statusi} /></td>
                     <td className="num actions-cell" onClick={(e) => e.stopPropagation()}>
                       <button className="icon-btn" title={isDraft ? 'Hap draftin' : 'Shiko faturën'} onClick={open}><Eye size={17} /></button>
@@ -207,7 +214,7 @@ export function InvoiceList({ fixedClientId }) {
                 <tr>
                   <td colSpan={fixedClientId ? 2 : 3} className="muted small">Totali i kësaj faqeje (pa anuluarat)</td>
                   <td className="num">{Object.entries(totals).map(([c, v]) => <div key={c}>{formatMoney(v, c)}</div>)}</td>
-                  <td colSpan={4} />
+                  <td colSpan={5} />
                 </tr>
               </tfoot>
             )}
@@ -215,6 +222,9 @@ export function InvoiceList({ fixedClientId }) {
         </div>
         {modal?.type === 'anulo' && (
           <CancelModal inv={modal.inv} actorName={profile?.emri} onClose={() => { setModal(null); reload() }} />
+        )}
+        {modal?.type === 'paguaj' && (
+          <PayInvoiceModal inv={modal.inv} actorName={profile?.emri} onClose={() => { setModal(null); reload() }} />
         )}
         {modal?.type === 'korrigjo' && (
           <CorrectModal inv={modal.inv} actorName={profile?.emri} onClose={() => setModal(null)} onDone={(draftId) => navigate(`/fature-e-re?draft=${draftId}`)} />
@@ -345,6 +355,85 @@ function CorrectModal({ inv, actorName, onClose, onDone }) {
         <div className="modal-actions">
           <button type="button" className="btn" onClick={onClose}>Mbyll</button>
           <button className="btn primary" disabled={busy || !arsye.trim()}>{busy ? 'Duke korrigjuar…' : 'Anulo dhe hap draftin'}</button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+/**
+ * Checkbox "e paguar": bosh te "Pa paguar" (klikimi regjistron pagesën e borxhit
+ * të mbetur), i shënuar te "E paguar". Te "Pasuar" borxhi ndodhet te fatura më e re.
+ */
+function PaidCheckbox({ r, canPay, onPay }) {
+  if (r.statusi === 'draft' || r.statusi === 'anuluar') return null
+  if (r.statusi === 'e_paguar') return <input type="checkbox" checked readOnly disabled title="E paguar" />
+  if (r.statusi === 'pasuar') return <input type="checkbox" checked={false} readOnly disabled title="Borxhi u bart te fatura më e re e klientit – paguhet atje" />
+  return (
+    <input
+      type="checkbox"
+      checked={false}
+      disabled={!canPay}
+      title={canPay ? 'Shëno si të paguar (regjistron pagesën e borxhit të mbetur)' : 'Nuk keni leje për të regjistruar pagesë'}
+      onChange={onPay}
+    />
+  )
+}
+
+/** Pagesë e plotë e borxhit që mban fatura (statusi kalon në "E paguar"). */
+function PayInvoiceModal({ inv, actorName, onClose }) {
+  const { settings } = useSettings()
+  const [metoda, setMetoda] = useState('arke')
+  const [dataText, setDataText] = useState(toInputDate())
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function onSubmit(e) {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      await addLedgerEntry({
+        clientId: inv.clientId,
+        tipi: 'pagese',
+        monedha: inv.monedha,
+        kursi: rateFor(inv.monedha, settings),
+        shuma: inv.mbetur,
+        data: fromInputDate(dataText),
+        metoda,
+        shenim: `Pagesë e plotë – fatura #${inv.numriTekst}`,
+      }, actorName)
+      onClose()
+    } catch (err) {
+      setError(err.code ? errorMessage(err) : err.message)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal title={`Shëno të paguar – fatura #${inv.numriTekst}`} onClose={onClose}>
+      <form onSubmit={onSubmit}>
+        <p>
+          Regjistrohet pagesa e borxhit të mbetur prej <b className="neg">{formatMoney(inv.mbetur, inv.monedha)}</b> nga{' '}
+          <b>{inv.klient?.emri}</b>. Fatura kalon në <b>E paguar</b> (edhe faturat "Pasuar" para saj), pagesa shkon në
+          kartelën e klientit dhe në arkë/bankë.
+        </p>
+        <div className="grid-2">
+          <label className="field">
+            <span>Mënyra e pagesës</span>
+            <select value={metoda} onChange={(e) => setMetoda(e.target.value)}>
+              {Object.entries(PAYMENT_METHODS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+          </label>
+          <label className="field">
+            <span>Data e pagesës</span>
+            <input type="date" value={dataText} onChange={(e) => setDataText(e.target.value)} required />
+          </label>
+        </div>
+        {error && <div className="alert error">{error}</div>}
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={onClose}>Anulo</button>
+          <button className="btn primary" disabled={busy}>{busy ? 'Duke regjistruar…' : `Paguaj ${formatMoney(inv.mbetur, inv.monedha)}`}</button>
         </div>
       </form>
     </Modal>
