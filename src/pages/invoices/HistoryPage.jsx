@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Search, X } from 'lucide-react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Search, X, Eye, Pencil, Trash2, MapPin } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
 import { watchClients } from '../../services/clientService'
-import { queryInvoices, queryAuditLog } from '../../services/invoiceService'
+import { queryInvoices, queryAuditLog, deleteDraft, correctInvoice } from '../../services/invoiceService'
 import { STATUS_LABELS } from '../../services/invoiceChain'
 import { errorMessage } from '../../services/authService'
 import { CURRENCIES, formatMoney, parseMoney } from '../../utils/money'
 import { endOfDay, formatDate, formatDateTime, startOfDay } from '../../utils/date'
 import SearchPicker from '../../components/SearchPicker'
-import { StatusBadge, ACTION_LABELS } from './InvoiceViewPage'
+import { StatusBadge, ACTION_LABELS, CancelModal } from './InvoiceViewPage'
+import Modal from '../../components/Modal'
 
 const EMPTY = { from: '', to: '', clientId: '', statusi: '', monedha: '', min: '', max: '', numri: '' }
 
@@ -35,6 +36,20 @@ export default function HistoryPage() {
 /** Lista e faturave me filtra; faqe nga serveri (cursor), 50 për faqe. */
 export function InvoiceList({ fixedClientId }) {
   const navigate = useNavigate()
+  const { perms, profile } = useAuth()
+  const [modal, setModal] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
+  const reload = () => setReloadKey((k) => k + 1)
+
+  async function onDeleteDraft(r) {
+    if (!window.confirm('Të fshihet drafti?')) return
+    try {
+      await deleteDraft(r.id, profile?.emri)
+      reload()
+    } catch (err) {
+      setError(err.code ? errorMessage(err) : err.message)
+    }
+  }
   const { data: clients } = useLive(watchClients, [], { enabled: !fixedClientId, initial: [] })
   const [draft, setDraft] = useState(EMPTY)
   const [filters, setFilters] = useState(EMPTY)
@@ -80,7 +95,7 @@ export function InvoiceList({ fixedClientId }) {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, page, toQuery])
+  }, [filters, page, toQuery, reloadKey])
 
   function apply(e) {
     e?.preventDefault()
@@ -132,47 +147,78 @@ export function InvoiceList({ fixedClientId }) {
 
       <div className="card no-pad">
         <div className="table-wrap">
-          <table className="table clickable-rows">
+          <table className="table clickable-rows history-table">
             <thead>
               <tr>
                 <th>Nr.</th>
                 <th>Data</th>
-                {!fixedClientId && <th>Klienti</th>}
-                <th className="num">Totali</th>
-                <th className="num">Paguar</th>
-                <th className="num">Gjendja e re</th>
+                {!fixedClientId && <th>Klienti &amp; qyteti</th>}
+                <th className="num">Vlera e faturës</th>
+                <th className="num">Arkëtuar</th>
+                <th className="num">Detyrimi</th>
                 <th>Statusi</th>
+                <th className="num">Veprime</th>
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={7} className="muted">Duke u ngarkuar…</td></tr>}
-              {!loading && !rows.length && <tr><td colSpan={7} className="muted">Asnjë faturë.</td></tr>}
-              {!loading && rows.map((r) => (
-                <tr key={r.id} onClick={() => navigate(r.statusi === 'draft' ? `/fature-e-re?draft=${r.id}` : `/fatura/${r.id}`)} className={r.statusi === 'anuluar' ? 'archived' : ''}>
-                  <td className="mono">
-                    {r.numriTekst ?? '—'}
-                    {r.numriVjeter && <div className="small muted">vjetër: {r.numriVjeter}</div>}
-                  </td>
-                  <td>{formatDate(r.data)}</td>
-                  {!fixedClientId && <td>{r.klient?.emri}</td>}
-                  <td className="num"><b>{formatMoney(r.totali, r.monedha)}</b></td>
-                  <td className="num">{r.statusi === 'draft' ? '' : formatMoney(r.paguar)}</td>
-                  <td className="num">{r.statusi === 'draft' ? '' : formatMoney(r.gjendjaRe)}</td>
-                  <td><StatusBadge statusi={r.statusi} /></td>
-                </tr>
-              ))}
+              {loading && <tr><td colSpan={8} className="muted">Duke u ngarkuar…</td></tr>}
+              {!loading && !rows.length && <tr><td colSpan={8} className="muted">Asnjë faturë.</td></tr>}
+              {!loading && rows.map((r) => {
+                const isDraft = r.statusi === 'draft'
+                const open = () => navigate(isDraft ? `/fature-e-re?draft=${r.id}` : `/fatura/${r.id}`)
+                return (
+                  <tr key={r.id} onClick={open} className={r.statusi === 'anuluar' ? 'archived' : ''}>
+                    <td className="mono">
+                      <b>{r.numriTekst ? `#${r.numriTekst}` : '—'}</b>
+                      {r.numriVjeter && <div className="small muted">vjetër: {r.numriVjeter}</div>}
+                    </td>
+                    <td>{formatDate(r.data)}</td>
+                    {!fixedClientId && (
+                      <td>
+                        <Link to={`/kliente/${r.clientId}`} className="client-link" onClick={(e) => e.stopPropagation()}>{r.klient?.emri}</Link>
+                        {r.klient?.qyteti && <div className="small muted city"><MapPin size={11} /> {r.klient.qyteti}</div>}
+                      </td>
+                    )}
+                    <td className="num"><b>{formatMoney(r.totali, r.monedha)}</b></td>
+                    <td className="num pos">{isDraft ? '' : formatMoney(r.paguar, r.monedha)}</td>
+                    <td className="num"><Debt r={r} /></td>
+                    <td><StatusBadge statusi={r.statusi} /></td>
+                    <td className="num actions-cell" onClick={(e) => e.stopPropagation()}>
+                      <button className="icon-btn" title={isDraft ? 'Hap draftin' : 'Shiko faturën'} onClick={open}><Eye size={17} /></button>
+                      {isDraft && perms.has('fature_leshim') && (
+                        <button className="icon-btn" title="Ndrysho draftin" onClick={open}><Pencil size={17} /></button>
+                      )}
+                      {!isDraft && r.statusi !== 'anuluar' && perms.has('anulim_fature') && perms.has('fature_leshim') && (
+                        <button className="icon-btn" title="Korrigjo (anulo dhe krijo draft të ri)" onClick={() => setModal({ type: 'korrigjo', inv: r })}><Pencil size={17} /></button>
+                      )}
+                      {isDraft && perms.has('fature_leshim') && (
+                        <button className="icon-btn danger-text" title="Fshi draftin" onClick={() => onDeleteDraft(r)}><Trash2 size={17} /></button>
+                      )}
+                      {!isDraft && r.statusi !== 'anuluar' && perms.has('anulim_fature') && (
+                        <button className="icon-btn danger-text" title="Anulo faturën" onClick={() => setModal({ type: 'anulo', inv: r })}><Trash2 size={17} /></button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
             {!loading && Object.keys(totals).length > 0 && (
               <tfoot>
                 <tr>
                   <td colSpan={fixedClientId ? 2 : 3} className="muted small">Totali i kësaj faqeje (pa anuluarat)</td>
                   <td className="num">{Object.entries(totals).map(([c, v]) => <div key={c}>{formatMoney(v, c)}</div>)}</td>
-                  <td colSpan={3} />
+                  <td colSpan={4} />
                 </tr>
               </tfoot>
             )}
           </table>
         </div>
+        {modal?.type === 'anulo' && (
+          <CancelModal inv={modal.inv} actorName={profile?.emri} onClose={() => { setModal(null); reload() }} />
+        )}
+        {modal?.type === 'korrigjo' && (
+          <CorrectModal inv={modal.inv} actorName={profile?.emri} onClose={() => setModal(null)} onDone={(draftId) => navigate(`/fature-e-re?draft=${draftId}`)} />
+        )}
         <div className="pager">
           <button className="btn small" disabled={page === 0 || loading} onClick={() => setPage(page - 1)}>‹ Para</button>
           <span className="muted small">Faqja {page + 1}</span>
@@ -241,4 +287,66 @@ function describeDetails(d) {
     .filter((k) => d[k])
     .map((k) => String(d[k]))
     .join(' · ')
+}
+
+/** Detyrimi (mbetja e papaguar) i faturës. */
+function Debt({ r }) {
+  if (r.statusi === 'draft' || r.statusi === 'anuluar') return <span className="muted">—</span>
+  if (r.statusi === 'pa_paguar') return <b className="neg">{formatMoney(r.mbetur, r.monedha)}</b>
+  if (r.statusi === 'pasuar') {
+    return (
+      <span title="Borxhi u bart te fatura pasardhëse e klientit">
+        <span className="muted">{formatMoney(r.gjendjaRe, r.monedha)}</span>
+        <div className="small muted">bartur</div>
+      </span>
+    )
+  }
+  return (
+    <span>
+      <b className="pos">{formatMoney(0, r.monedha)}</b>
+      {r.gjendjaRe < 0 && <div className="small muted">tepricë {formatMoney(-r.gjendjaRe)}</div>}
+    </span>
+  )
+}
+
+/** Korrigjim: anulon faturën dhe hap një draft të ri me të njëjtat të dhëna. */
+function CorrectModal({ inv, actorName, onClose, onDone }) {
+  const [arsye, setArsye] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function onSubmit(e) {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      const draftId = await correctInvoice(inv.id, arsye, actorName)
+      onDone(draftId)
+    } catch (err) {
+      setError(err.code ? errorMessage(err) : err.message)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal title={`Korrigjo faturën Nr. ${inv.numriTekst}`} onClose={onClose}>
+      <form onSubmit={onSubmit}>
+        <p>Një faturë e lëshuar nuk ndryshohet. Korrigjimi bëhet kështu:</p>
+        <ol className="steps">
+          <li>Fatura <b>#{inv.numriTekst}</b> anulohet (mbetet në histori si "Anuluar"); kartela dhe stoku kthehen mbrapsht.</li>
+          {inv.paguar > 0 && <li>Pagesa prej {formatMoney(inv.paguar, inv.monedha)} mbetet te klienti si tepricë dhe kalon vetë te fatura e re.</li>}
+          <li>Hapet një <b>draft i ri</b> me të njëjtat artikuj dhe çmime, që e ndryshoni dhe e lëshoni me numër të ri.</li>
+        </ol>
+        <label className="field">
+          <span>Arsyeja e korrigjimit *</span>
+          <textarea rows={2} value={arsye} onChange={(e) => setArsye(e.target.value)} placeholder="p.sh. sasi e gabuar te artikulli X" required autoFocus />
+        </label>
+        {error && <div className="alert error">{error}</div>}
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={onClose}>Mbyll</button>
+          <button className="btn primary" disabled={busy || !arsye.trim()}>{busy ? 'Duke korrigjuar…' : 'Anulo dhe hap draftin'}</button>
+        </div>
+      </form>
+    </Modal>
+  )
 }

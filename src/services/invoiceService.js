@@ -1,5 +1,5 @@
 import {
-  getDocs, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp,
+  getDoc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp,
   startAfter, where, writeBatch,
 } from 'firebase/firestore'
 import { auth, db } from '../firebase'
@@ -393,6 +393,30 @@ export async function cancelInvoice(id, arsye, actorName, { kthePagesen = false 
       actorName,
     })
   })
+}
+
+/**
+ * Korrigjim i një fature të lëshuar: fatura anulohet (pagesa mbetet si tepricë
+ * e klientit, ndaj kalon vetë te fatura e re si gjendje e mëparshme) dhe krijohet
+ * një draft i ri me të njëjtat të dhëna, që ndryshohet dhe lëshohet me numër të ri.
+ * @returns id e draftit të ri
+ */
+export async function correctInvoice(id, arsye, actorName) {
+  if (!arsye?.trim()) throw new Error('Arsyeja e korrigjimit është e detyrueshme.')
+  await cancelInvoice(id, `Korrigjim: ${arsye.trim()}`, actorName, { kthePagesen: false })
+  const X = (await getDoc(invoiceRef(id))).data()
+  const client = (await getDoc(companyDoc('clients', X.clientId))).data()
+  return saveDraft(null, {
+    clientId: X.clientId,
+    client,
+    monedha: X.monedha,
+    kursi: X.kursi,
+    data: X.data,
+    rreshtat: X.rreshtat,
+    shenime: X.shenime ?? '',
+    paguar: 0,
+    metodaPagese: X.metodaPagese ?? 'arke',
+  }, actorName)
 }
 
 // ---------- Leximet ----------

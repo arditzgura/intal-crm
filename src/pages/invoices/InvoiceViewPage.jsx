@@ -172,7 +172,7 @@ export const ACTION_LABELS = {
   anulim_fature: 'Anuloi faturën',
 }
 
-function CancelModal({ inv, actorName, onClose }) {
+export function CancelModal({ inv, actorName, onClose }) {
   const [arsye, setArsye] = useState('')
   const [pagesa, setPagesa] = useState('teprice')
   const [busy, setBusy] = useState(false)

@@ -528,8 +528,17 @@ export async function runImport(ops, { hash, startAt = 0, onProgress }) {
     }
     batch.set(metaRef(), { done: end, ndryshuar: serverTimestamp(), ...(end === ops.length ? { perfunduar: true } : {}) }, { merge: true })
     try {
-      await batch.commit()
+      // Kur mbaron kuota ditore, Firestore nuk e refuzon shkrimin por e riprovon pa fund.
+      // Pas 60 sekondash pa përgjigje e trajtojmë si kuotë të mbaruar.
+      let timer
+      await Promise.race([
+        batch.commit().finally(() => clearTimeout(timer)),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new QuotaError(`Firebase nuk po pranon më shkrime pas ${i} nga ${ops.length} – me shumë gjasa u arrit kuota ditore.`)), 60000)
+        }),
+      ])
     } catch (err) {
+      if (err instanceof QuotaError) throw err
       if (err?.code === 'resource-exhausted') throw new QuotaError(`Kuota ditore e Firebase u arrit pas ${i} nga ${ops.length} shkrime.`)
       throw err
     }

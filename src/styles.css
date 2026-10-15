@@ -460,3 +460,14 @@ h3.pad { padding: 14px 14px 0; }
 .progress-wrap { margin-bottom: 12px; }
 .progress { height: 12px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
 .progress-bar { height: 100%; background: var(--primary); transition: width 0.3s; }
+
+/* Historiku: kolonat si te sistemi i vjetër */
+.history-table th { white-space: nowrap; }
+.client-link { font-weight: 700; color: var(--primary); text-decoration: none; text-transform: uppercase; }
+.client-link:hover { text-decoration: underline; }
+.city { display: flex; align-items: center; gap: 3px; text-transform: uppercase; font-size: 0.75rem; }
+.actions-cell { white-space: nowrap; }
+.actions-cell .icon-btn { display: inline-grid; color: var(--muted); padding: 5px; border-radius: 6px; }
+.actions-cell .icon-btn:hover { background: #f1f5f9; color: var(--text); }
+.actions-cell .icon-btn.danger-text:hover { color: var(--danger); }
+.steps { margin: 0 0 12px; padding-left: 20px; line-height: 1.6; }
