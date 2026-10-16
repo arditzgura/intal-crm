@@ -130,21 +130,21 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="acc-tiles">
-          <div className="acc-tile">
+          <div className="acc-tile acc-white">
             <span>Xhiro totale (LEK)</span>
             <b>{allSum ? formatMoney(lek(allSum.sales)) : '…'}</b>
             <small className="acc-green"><TrendingUp size={12} /> {allSum ? `${allSum.count.toLocaleString('sq')} fatura totale` : ''}{allSum && extra(allSum.sales) ? ` · + ${extra(allSum.sales)}` : ''}</small>
           </div>
           {showProfit && (
-            <div className="acc-tile" title="Shitjet në LEK − sasia × kosto aktuale e artikujve">
-              <span className="acc-green">Fitimi akumuluar (LEK)</span>
-              <b className="acc-green">{allProfit == null ? '…' : allProfit === undefined ? '—' : formatMoney(allProfit)}</b>
+            <div className="acc-tile acc-profit" title="Shitjet në LEK − sasia × kosto aktuale e artikujve">
+              <span>Fitimi akumuluar (LEK)</span>
+              <b>{allProfit == null ? '…' : allProfit === undefined ? '—' : formatMoney(allProfit)}</b>
               <small>Pas zbritjes së kostos së blerjes</small>
             </div>
           )}
-          <div className="acc-tile">
-            <span className="acc-yellow">Arkëtuar gjithsej (LEK)</span>
-            <b className="acc-yellow">{allSum ? (allSum.receiptsError ? '—' : formatMoney(lek(allSum.receipts))) : '…'}</b>
+          <div className="acc-tile acc-receipts">
+            <span>Arkëtuar gjithsej (LEK)</span>
+            <b>{allSum ? (allSum.receiptsError ? '—' : formatMoney(lek(allSum.receipts))) : '…'}</b>
             <small>Vlera monetare e futur në arkë</small>
           </div>
           <div className="acc-tile acc-debt">
