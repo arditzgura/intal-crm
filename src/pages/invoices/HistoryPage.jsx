@@ -19,6 +19,7 @@ import { formatDate, formatDateTime, fromInputDate, periodLabel, periodRange, to
 import { StatusBadge, ACTION_LABELS, CancelModal } from './InvoiceViewPage'
 import Modal from '../../components/Modal'
 import InvoicePreview from '../../components/invoice/InvoicePreview'
+import PeriodReport from './PeriodReport'
 import { useSort, SortTh } from '../../hooks/useSort'
 import PeriodFilter, { defaultPeriod } from '../../components/PeriodFilter'
 
@@ -155,7 +156,7 @@ export function InvoiceList({ fixedClientId, period: extPeriod, setPeriod: extSe
       {error && <div className="alert error">{error}</div>}
 
       {preview && <InvoicePreview invoice={preview} onClose={() => setPreview(null)} />}
-      {report && <ReportModal target={target} filters={baseFilters} label={label} onClose={() => setReport(false)} />}
+      {report && <PeriodReport initialPeriod={period} onClose={() => setReport(false)} />}
 
       <div className="card no-pad">
         {s.sort && more && <div className="sort-hint">Renditja vlen për faturat e kësaj faqeje. Përdorni filtrat për të ngushtuar listën.</div>}

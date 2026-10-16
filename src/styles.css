@@ -687,3 +687,12 @@ th.sortable.sorted { color: var(--primary); }
 th.sortable.sorted .sort-icon { opacity: 1; }
 .ni-lines-head .sortable { cursor: default; }
 .sort-hint { font-size: 0.75rem; color: var(--muted); padding: 8px 14px 0; }
+
+/* Raporti i periudhës (Historiku → Raport) */
+.pr-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.pr-toolbar input, .pr-toolbar select { width: auto; }
+.pr-label { color: #4f46e5; text-transform: uppercase; letter-spacing: 0.6px; }
+.pr-table-wrap { max-height: 60vh; overflow-y: auto; }
+.pr-table th { font-size: 0.72rem; }
+.pr-table td { padding: 11px 12px; }
+.pr-profit, .pr-profit b { color: #d97706; }
