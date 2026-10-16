@@ -116,6 +116,9 @@ export default function ClientProfilePage() {
         )}
       </div>
 
+      {tab !== 'furnitori' && (
+        <div className="card period-card no-print"><PeriodFilter period={period} setPeriod={setPeriod} /></div>
+      )}
       <div className="tabs no-print" role="tablist">
         {[...TABS, ...(client.tipi !== 'klient' ? [['furnitori', 'Furnitori']] : [])].map(([k, label]) => (
           <button key={k} role="tab" className={`tab ${tab === k ? 'active' : ''}`} onClick={() => setParams({ skeda: k })}>
@@ -125,9 +128,6 @@ export default function ClientProfilePage() {
       </div>
 
       {ledgerError && <div className="alert error">{errorMessage(ledgerError)}</div>}
-      {tab !== 'furnitori' && (
-        <div className="card period-card no-print"><PeriodFilter period={period} setPeriod={setPeriod} /></div>
-      )}
       {tab === 'faturat' && <InvoiceList fixedClientId={client.id} period={period} setPeriod={setPeriod} />}
       {tab === 'blerjet' && <ClientPurchases client={client} range={range} />}
       {tab === 'piket' && (
