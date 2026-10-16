@@ -513,13 +513,15 @@ export async function invoiceSummary(range) {
   const out = { count: 0, sales: {}, receipts: {}, unpaid: {}, receiptsError: false }
   await Promise.all(['LEK', 'EUR', 'USD'].map(async (cur) => {
     const inv = companyCol('invoices')
-    const [a, b] = await Promise.all([
-      getAggregateFromServer(query(inv, where('monedha', '==', cur), where('statusi', 'in', ISSUED), ...rangeCons(range)), { n: count(), s: sum('totali') }),
-      getAggregateFromServer(query(inv, where('monedha', '==', cur), where('statusi', '==', 'pa_paguar'), ...rangeCons(range)), { s: sum('mbetur') }),
-    ])
-    out.count += a.data().n
-    if (a.data().s) out.sales[cur] = a.data().s
-    if (b.data().s) out.unpaid[cur] = b.data().s
+    // Një kërkesë për çdo status (barazi) – përdor indekset (monedha, statusi[, data]).
+    const perStatus = await Promise.all(ISSUED.map((st) =>
+      getAggregateFromServer(query(inv, where('monedha', '==', cur), where('statusi', '==', st), ...rangeCons(range)), { n: count(), s: sum('totali'), m: sum('mbetur') }),
+    ))
+    perStatus.forEach((r, i) => {
+      out.count += r.data().n
+      if (r.data().s) out.sales[cur] = (out.sales[cur] ?? 0) + r.data().s
+      if (ISSUED[i] === 'pa_paguar' && r.data().m) out.unpaid[cur] = r.data().m
+    })
     try {
       const c = await getAggregateFromServer(query(companyCol('ledger'), where('tipi', '==', 'pagese'), where('monedha', '==', cur), ...rangeCons(range)), { s: sum('shuma') })
       if (c.data().s) out.receipts[cur] = -c.data().s
