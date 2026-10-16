@@ -549,6 +549,24 @@ export async function invoiceProfit(range, itemIds, costs) {
   return profit
 }
 
+/**
+ * Shitjet e çdo artikulli (gjithë kohës, faturat në LEK, pa të anuluarat), me sum nga serveri:
+ * { itemId: { totali, sasia } }.
+ */
+export async function itemSalesTotals(itemIds) {
+  const out = {}
+  for (let i = 0; i < itemIds.length; i += 20) {
+    await Promise.all(itemIds.slice(i, i + 20).map(async (itemId) => {
+      const r = await getAggregateFromServer(
+        query(companyCol('invoiceLines'), where('itemId', '==', itemId), where('monedha', '==', 'LEK'), where('anuluar', '==', false)),
+        { t: sum('totali'), q: sum('sasia') },
+      )
+      out[itemId] = { totali: r.data().t ?? 0, sasia: r.data().q ?? 0 }
+    }))
+  }
+  return out
+}
+
 /** Numri i radhës së faturës (vetëm për shfaqje; numri jepet në lëshim). */
 export function watchNextInvoiceNumber(onData, onError) {
   return onSnapshot(companyDoc('counters', 'invoices'), (s) => onData(s.exists() ? s.data().next : 1), onError)

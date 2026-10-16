@@ -696,3 +696,8 @@ th.sortable.sorted .sort-icon { opacity: 1; }
 .pr-table th { font-size: 0.72rem; }
 .pr-table td { padding: 11px 12px; }
 .pr-profit, .pr-profit b { color: #d97706; }
+
+/* Lista e artikujve */
+.items-table .item-name { text-transform: uppercase; }
+.th-stack { display: inline-flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
+.th-stack b { font-size: 0.95rem; letter-spacing: 0; text-transform: none; }
