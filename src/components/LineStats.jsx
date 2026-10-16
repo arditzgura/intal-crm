@@ -19,7 +19,7 @@ import { useSort, SortTh } from '../hooks/useSort'
  *  mode 'item':   klientët që e kanë blerë artikullin (field = itemId, group = clientId)
  * `names`: { id: { label, sub, link } } për kolonën e parë.
  */
-export default function LineStats({ mode, id, names, title, range }) {
+export default function LineStats({ mode, id, names, title, range, hideSummary }) {
   const { perms } = useAuth()
   const showProfit = canSeeCost(perms)
   const field = mode === 'client' ? 'clientId' : 'itemId'
@@ -73,6 +73,7 @@ export default function LineStats({ mode, id, names, title, range }) {
   return (
     <div className="card no-pad">
       <div className="card-toolbar wrap-toolbar">
+        {!hideSummary ? (
         <div className="stat-chips">
           <div className="stat-chip">
             <span>Blerjet totale</span>
@@ -89,6 +90,7 @@ export default function LineStats({ mode, id, names, title, range }) {
           )}
           <div className="stat-chip"><span>Fatura</span><b>{st.invoiceCount}</b></div>
         </div>
+        ) : <span />}
         <div className="filters-inline">
           {!range && <label className="inline-field">Nga <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>}
           {!range && <label className="inline-field">Deri <input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>}
@@ -134,7 +136,7 @@ export default function LineStats({ mode, id, names, title, range }) {
           </tbody>
         </table>
       </div>
-      {showProfit && !st.profitKnown && (
+      {showProfit && !hideSummary && !st.profitKnown && (
         <p className="muted small pad">* Disa artikuj nuk kanë kosto; fitimi i tyre nuk përfshihet.</p>
       )}
       {showProfit && <p className="muted small pad">Fitimi = shitja në LEK − sasia × kosto e artikullit në datën e faturës.</p>}
