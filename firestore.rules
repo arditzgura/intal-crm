@@ -29,7 +29,7 @@ service cloud.firestore {
       return r == 'shites'
         ? ['mod_fature_e_re', 'mod_historiku', 'mod_kliente', 'mod_artikujt', 'mod_inventari', 'fature_leshim', 'kliente_ndrysho', 'pagese']
         : r == 'finance'
-          ? ['mod_historiku', 'mod_kliente', 'mod_blerje', 'mod_financa', 'mod_raporte', 'pagese', 'levizje_kartele', 'rregullim_gjendjeje', 'piket', 'sheh_koston', 'blerje_regjistro', 'financa_furnitore', 'financa_shpenzime', 'financa_arka']
+          ? ['mod_paneli', 'mod_historiku', 'mod_kliente', 'mod_blerje', 'mod_financa', 'mod_raporte', 'pagese', 'levizje_kartele', 'rregullim_gjendjeje', 'piket', 'sheh_koston', 'blerje_regjistro', 'financa_furnitore', 'financa_shpenzime', 'financa_arka']
           : r == 'magazinier'
             ? ['mod_artikujt', 'mod_blerje', 'mod_inventari', 'artikuj_ndrysho', 'sheh_koston', 'blerje_regjistro', 'inventar_rregullim']
             : [];
@@ -356,7 +356,7 @@ service cloud.firestore {
       // Gjendja (`gjendje`) dhe pikët (`piket`) ndryshojnë VETËM bashkë me një
       // lëvizje të re në kartelë / pikë, dhe saktësisht me shumën e saj.
       match /clients/{clientId} {
-        allow read: if canAny(companyId, ['mod_kliente', 'mod_fature_e_re', 'mod_historiku', 'mod_financa', 'mod_raporte', 'mod_blerje', 'mod_shitjet', 'artikuj_ndrysho']);
+        allow read: if canAny(companyId, ['mod_kliente', 'mod_fature_e_re', 'mod_historiku', 'mod_financa', 'mod_raporte', 'mod_blerje', 'mod_shitjet', 'artikuj_ndrysho', 'mod_paneli']);
         allow create: if can(companyId, 'kliente_ndrysho')
           && validClient(request.resource.data)
           && request.resource.data.gjendje == {}
@@ -394,7 +394,7 @@ service cloud.firestore {
 
       // Kartela: vetëm shtim. Gabimet korrigjohen me lëvizje të kundërt.
       match /ledger/{entryId} {
-        allow read: if canAny(companyId, ['mod_kliente', 'mod_financa', 'mod_raporte']);
+        allow read: if canAny(companyId, ['mod_kliente', 'mod_financa', 'mod_raporte', 'mod_paneli']);
         allow create: if validLedger(companyId, entryId);
         allow update, delete: if false;
       }
@@ -448,7 +448,7 @@ service cloud.firestore {
       // Drafti ndryshohet / fshihet lirisht. Fatura e lëshuar nuk ndryshohet: lejohen
       // vetëm fushat e zinxhirit (statusi, mbetur, faturaPas, piketDhene) dhe anulimi.
       match /invoices/{invoiceId} {
-        allow read: if canAny(companyId, ['mod_historiku', 'mod_fature_e_re', 'mod_kliente', 'mod_raporte', 'mod_financa', 'mod_shitjet']);
+        allow read: if canAny(companyId, ['mod_historiku', 'mod_fature_e_re', 'mod_kliente', 'mod_raporte', 'mod_financa', 'mod_shitjet', 'mod_paneli']);
         allow create: if can(companyId, 'fature_leshim')
           && (isDraft(request.resource.data) || issuedOk(companyId, invoiceId));
         allow update: if (
@@ -477,7 +477,7 @@ service cloud.firestore {
       }
 
       match /invoiceLines/{lineId} {
-        allow read: if canAny(companyId, ['mod_kliente', 'mod_artikujt', 'mod_raporte', 'mod_historiku', 'mod_shitjet']);
+        allow read: if canAny(companyId, ['mod_kliente', 'mod_artikujt', 'mod_raporte', 'mod_historiku', 'mod_shitjet', 'mod_paneli']);
         allow create: if can(companyId, 'fature_leshim')
           && issuedNow(companyId, request.resource.data.invoiceId)
           && request.resource.data.anuluar == false;
@@ -590,7 +590,7 @@ service cloud.firestore {
 
       // Kopja e gjendjes së arkës/bankës (increment); Admini e rindërton nga lëvizjet.
       match /cashBalances/{docId} {
-        allow read: if canAny(companyId, ['mod_financa', 'mod_raporte']);
+        allow read: if canAny(companyId, ['mod_financa', 'mod_raporte', 'mod_paneli']);
         allow write: if canAny(companyId, ['pagese', 'fature_leshim', 'anulim_fature', 'financa_furnitore', 'financa_shpenzime', 'financa_arka'])
           && request.resource.data.keys().hasOnly(['arke', 'banke', 'rillogaritur']);
       }

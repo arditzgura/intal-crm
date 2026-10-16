@@ -11,6 +11,7 @@ export const ROLES = {
 // `perm` = leja që e shfaq rubrikën; `phase` = faza e SPEC.md ku ndërtohet.
 export const MODULES = [
   { key: 'fature-e-re', label: 'Faturë e Re', icon: 'FilePlus2', perm: 'mod_fature_e_re', phase: 3, primary: true },
+  { key: 'paneli', label: 'Paneli', icon: 'LayoutDashboard', perm: 'mod_paneli', phase: 6 },
   { key: 'historiku', label: 'Historiku', icon: 'History', perm: 'mod_historiku', phase: 3 },
   { key: 'kliente', label: 'Klientë', icon: 'Users', perm: 'mod_kliente', phase: 2 },
   { key: 'artikujt', label: 'Artikujt', icon: 'Package', perm: 'mod_artikujt', phase: 2 },
@@ -32,6 +33,7 @@ export function modulesFor(perms) {
 }
 
 export function homePathFor(perms) {
+  if (perms.has('mod_paneli')) return '/paneli'
   const first = modulesFor(perms)[0]
   return first ? `/${first.key}` : '/profili'
 }

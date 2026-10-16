@@ -567,6 +567,21 @@ export async function itemSalesTotals(itemIds, range) {
   return out
 }
 
+/** Shitjet (LEK) për 12 muajt e fundit: [{ key: 'YYYY-MM', totali, fatura }], sum/count nga serveri. */
+export async function monthlySales(months = 12) {
+  const now = new Date()
+  const list = Array.from({ length: months }, (_, i) => new Date(now.getFullYear(), now.getMonth() - (months - 1 - i), 1))
+  return Promise.all(list.map(async (d) => {
+    const from = new Date(d.getFullYear(), d.getMonth(), 1)
+    const to = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
+    const r = await getAggregateFromServer(
+      query(companyCol('invoices'), where('monedha', '==', 'LEK'), where('statusi', 'in', ISSUED), ...rangeCons({ from, to })),
+      { t: sum('totali'), n: count() },
+    )
+    return { key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, totali: r.data().t ?? 0, fatura: r.data().n }
+  }))
+}
+
 /** Numri i radhës së faturës (vetëm për shfaqje; numri jepet në lëshim). */
 export function watchNextInvoiceNumber(onData, onError) {
   return onSnapshot(companyDoc('counters', 'invoices'), (s) => onData(s.exists() ? s.data().next : 1), onError)

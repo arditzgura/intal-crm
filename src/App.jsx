@@ -24,6 +24,7 @@ import PurchaseViewPage from './pages/purchases/PurchaseViewPage'
 import SalesPage from './pages/sales/SalesPage'
 import FinancePage from './pages/finance/FinancePage'
 import ReportsPage from './pages/reports/ReportsPage'
+import DashboardPage from './pages/dashboard/DashboardPage'
 import { errorMessage } from './services/authService'
 
 const PAGES = {
@@ -37,6 +38,7 @@ const PAGES = {
   shitjet: SalesPage,
   financa: FinancePage,
   raporte: ReportsPage,
+  paneli: DashboardPage,
 }
 
 export default function App() {

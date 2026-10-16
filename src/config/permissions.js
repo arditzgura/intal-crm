@@ -7,6 +7,7 @@ export const PERMISSION_GROUPS = [
   {
     label: 'Rubrikat që sheh',
     items: [
+      ['mod_paneli', 'Paneli (përmbledhja)'],
       ['mod_fature_e_re', 'Faturë e Re'],
       ['mod_historiku', 'Historiku'],
       ['mod_kliente', 'Klientë'],
@@ -72,7 +73,7 @@ export const TEMPLATES = {
   },
   finance: {
     label: 'Financë',
-    lejet: ['mod_historiku', 'mod_kliente', 'mod_blerje', 'mod_financa', 'mod_raporte', 'pagese', 'levizje_kartele', 'rregullim_gjendjeje', 'piket', 'sheh_koston', 'blerje_regjistro', 'financa_furnitore', 'financa_shpenzime', 'financa_arka'],
+    lejet: ['mod_paneli', 'mod_historiku', 'mod_kliente', 'mod_blerje', 'mod_financa', 'mod_raporte', 'pagese', 'levizje_kartele', 'rregullim_gjendjeje', 'piket', 'sheh_koston', 'blerje_regjistro', 'financa_furnitore', 'financa_shpenzime', 'financa_arka'],
   },
   magazinier: {
     label: 'Magazinier',
