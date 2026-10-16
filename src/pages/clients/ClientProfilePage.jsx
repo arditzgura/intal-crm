@@ -97,14 +97,10 @@ export default function ClientProfilePage() {
         </div>
 
         <div className="details-grid">
-          <Detail label="NIPT" value={client.nipt} />
           <Detail label="Telefoni" value={client.telefoni} />
-          <Detail label="Email" value={client.email} />
-          <Detail label="Adresa" value={client.adresa} />
-          <Detail label="Monedha e preferuar" value={client.monedhaPreferuar} />
-          <Detail label="Pagesa e fundit" value={lastPayment ? `${formatMoney(-lastPayment.shuma, lastPayment.monedha)} · ${formatDate(lastPayment.data)}` : '—'} />
-          <Detail label="Totali i blerë" value={Object.keys(invoiced).length ? Object.entries(invoiced).map(([c, v]) => formatMoney(v, c)).join(' · ') : '—'} />
+          <Detail label="Adresa" value={[client.adresa, client.qyteti].filter(Boolean).join(', ')} />
           <Detail label="Pikët" value={client.rastesor ? 'Nuk mbledh pikë' : String(client.piket ?? 0)} />
+          <Detail label="Monedha" value={client.monedhaPreferuar} />
         </div>
         {client.shenime && <p className="notes">{client.shenime}</p>}
 
