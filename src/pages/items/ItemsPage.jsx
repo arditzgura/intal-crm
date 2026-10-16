@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Pencil, Trash2, ArchiveRestore, AlertTriangle } from 'lucide-react'
+import { Plus, Pencil, Trash2, ArchiveRestore, AlertTriangle, ShoppingCart, Layers } from 'lucide-react'
+import PeriodFilter, { defaultPeriod } from '../../components/PeriodFilter'
+import { periodLabel, periodRange } from '../../utils/date'
 import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
 import { useSettings } from '../../hooks/useSettings'
@@ -32,6 +34,8 @@ export default function ItemsPage() {
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState(null)
   const [sales, setSales] = useState(null)
+  const [period, setPeriod] = useState(defaultPeriod)
+  const range = useMemo(() => periodRange(period), [period])
   const [actionError, setActionError] = useState('')
 
   // Shitjet e çdo artikulli (sum nga serveri, një herë kur ngarkohet lista)
@@ -39,10 +43,13 @@ export default function ItemsPage() {
   useEffect(() => {
     if (!items.length) return undefined
     let cancelled = false
-    itemSalesTotals(items.map((i) => i.id)).then((r) => !cancelled && setSales(r)).catch(() => !cancelled && setSales({}))
+    setSales(null)
+    itemSalesTotals(items.map((i) => i.id), range).then((r) => !cancelled && setSales(r)).catch(() => !cancelled && setSales({}))
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemKey])
+  }, [itemKey, range])
+  const unitsSold = sales ? Object.values(sales).reduce((a, x) => a + (x.sasia ?? 0), 0) : null
+  const activeCount = items.filter((i) => !i.arkivuar).length
   const profitOf = (i) => (sales?.[i.id] && costs[i.id] != null ? sales[i.id].totali - sales[i.id].sasia * costs[i.id] : null)
   const totalProfit = sales ? items.reduce((a, i) => a + (profitOf(i) ?? 0), 0) : null
 
@@ -90,6 +97,21 @@ export default function ItemsPage() {
           </button>
         )}
       </div>
+
+      <div className="kpi-row items-kpis">
+        <div className="kpi kpi-dark kpi-pink">
+          <ShoppingCart className="kpi-icon" size={50} />
+          <span>Njësi të shitura ({periodLabel(period)})</span>
+          <div className="kpi-value">{unitsSold == null ? '…' : formatMoney(unitsSold * 100)} <small>njësi</small></div>
+        </div>
+        <div className="kpi kpi-white">
+          <Layers className="kpi-icon" size={50} />
+          <span>Numri i artikujve (zëra)</span>
+          <div className="kpi-value">{activeCount} <small>artikuj unikë</small></div>
+        </div>
+      </div>
+
+      <div className="card period-card"><PeriodFilter period={period} setPeriod={setPeriod} /></div>
 
       <div className="card filters">
         <input className="grow" placeholder="Kërko me kod ose emër…" value={q} onChange={(e) => setQ(e.target.value)} />

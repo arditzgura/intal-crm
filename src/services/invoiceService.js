@@ -550,15 +550,15 @@ export async function invoiceProfit(range, itemIds, costs) {
 }
 
 /**
- * Shitjet e çdo artikulli (gjithë kohës, faturat në LEK, pa të anuluarat), me sum nga serveri:
+ * Shitjet e çdo artikulli në periudhë (faturat në LEK, pa të anuluarat), me sum nga serveri:
  * { itemId: { totali, sasia } }.
  */
-export async function itemSalesTotals(itemIds) {
+export async function itemSalesTotals(itemIds, range) {
   const out = {}
   for (let i = 0; i < itemIds.length; i += 20) {
     await Promise.all(itemIds.slice(i, i + 20).map(async (itemId) => {
       const r = await getAggregateFromServer(
-        query(companyCol('invoiceLines'), where('itemId', '==', itemId), where('monedha', '==', 'LEK'), where('anuluar', '==', false)),
+        query(companyCol('invoiceLines'), where('itemId', '==', itemId), where('monedha', '==', 'LEK'), where('anuluar', '==', false), ...rangeCons(range)),
         { t: sum('totali'), q: sum('sasia') },
       )
       out[itemId] = { totali: r.data().t ?? 0, sasia: r.data().q ?? 0 }
