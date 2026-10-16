@@ -60,6 +60,22 @@ export default function NewInvoicePage() {
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [showDrafts, setShowDrafts] = useState(false)
+  // Navigimi me tastierë: refs për fushat e çdo rreshti dhe fusha që merr fokusin
+  const fieldRefs = useRef({})
+  const [focusTarget, setFocusTarget] = useState(null) // { key, field: 'qty' | 'item' }
+  const refFor = (key, field) => (el) => {
+    if (el) fieldRefs.current[`${key}:${field}`] = el
+    else delete fieldRefs.current[`${key}:${field}`]
+  }
+  useEffect(() => {
+    if (!focusTarget) return
+    const el = fieldRefs.current[`${focusTarget.key}:${focusTarget.field}`]
+    if (el) {
+      el.focus()
+      el.select?.()
+    }
+    setFocusTarget(null)
+  }, [focusTarget, lines])
 
   const client = clients.find((c) => c.id === clientId) ?? null
   const kursi = monedha === 'LEK' ? RATE_SCALE : parseRate(kursiText)
@@ -131,10 +147,31 @@ export default function NewInvoicePage() {
     if (!item) return
     const auto = autoPrice(item, prefs, monedha, kursi)
     setLines((ls) => {
-      const next = ls.map((l) => (l.key === key ? { ...l, itemId, kodi: item.kodi, emri: item.emri, njesia: item.njesia, cmimiText: formatMoney(auto), auto, manual: false } : l))
+      const next = ls.map((l) => (l.key === key ? { ...l, itemId, kodi: item.kodi, emri: item.emri, njesia: item.njesia, sasia: '', cmimiText: formatMoney(auto), auto, manual: false } : l))
       // Gjithmonë një rresht bosh në fund për artikullin e radhës
       return next[next.length - 1].itemId ? [...next, emptyLine()] : next
     })
+    setFocusTarget({ key, field: 'qty' })
+  }
+
+  /** Tastiera te sasia: ↓ / ↑ kalon rreshtin pa ndryshuar numrin; Enter → artikulli i radhës. */
+  function onQtyKey(e, key) {
+    const idx = lines.findIndex((l) => l.key === key)
+    const go = (target) => {
+      if (!target) return
+      setFocusTarget({ key: target.key, field: target.itemId ? 'qty' : 'item' })
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      go(lines[idx + 1])
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      go(lines.slice(0, idx).reverse().find((l) => l.itemId))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      const empty = lines.find((l) => !l.itemId)
+      if (empty) setFocusTarget({ key: empty.key, field: 'item' })
+    }
   }
   const updateLine = (key, patch) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)))
   const removeLine = (key) => setLines((ls) => {
@@ -161,11 +198,6 @@ export default function NewInvoicePage() {
   const gjManual = gjParaText != null ? parseMoney(gjParaText) : null
   const gjendjaPara = gjManual ?? gjAuto
   const manualChanged = gjParaText != null && gjManual != null && gjManual !== gjAuto
-
-  // Klienti Rastësor paguan zakonisht menjëherë: "Paguar" ndjek totalin derisa ta ndryshojë përdoruesi.
-  useEffect(() => {
-    if (client?.rastesor && !paguarTouched) setPaguarText(totali ? formatMoney(totali) : '')
-  }, [client?.rastesor, totali, paguarTouched])
 
   const paguar = paguarText.trim() ? parseMoney(paguarText) : 0
   const gjendjaRe = gjendjaPara + totali - (paguar ?? 0)
@@ -367,10 +399,20 @@ export default function NewInvoicePage() {
                       {overStock(l.itemId) && <div className="small stock-warn"><AlertTriangle size={12} /> Stoku: {stock[l.itemId] ?? 0} {l.njesia}</div>}
                     </>
                   ) : (
-                    <ItemSearch items={items} prefs={prefs} stock={stock} onPick={(id) => setItem(l.key, id)} />
+                    <ItemSearch inputRef={refFor(l.key, 'item')} items={items} prefs={prefs} stock={stock} onPick={(id) => setItem(l.key, id)} />
                   )}
                 </div>
-                <input className="ni-qty" type="number" min={1} step={1} value={l.sasia} disabled={!l.itemId} onChange={(e) => updateLine(l.key, { sasia: e.target.value })} />
+                <input
+                  ref={refFor(l.key, 'qty')}
+                  className="ni-qty"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder={l.itemId ? 'Sasia' : ''}
+                  value={l.sasia}
+                  disabled={!l.itemId}
+                  onChange={(e) => updateLine(l.key, { sasia: e.target.value.replace(/[^0-9]/g, '') })}
+                  onKeyDown={(e) => onQtyKey(e, l.key)}
+                />
                 <input className="ni-price" inputMode="decimal" placeholder="0" value={l.cmimiText} disabled={!l.itemId}
                   onChange={(e) => updateLine(l.key, { cmimiText: e.target.value, manual: parseMoney(e.target.value) !== l.auto })} />
                 <div className="ni-sum">{formatMoney(p?.totali ?? 0)}</div>
@@ -464,7 +506,7 @@ export default function NewInvoicePage() {
 }
 
 /** Kërkimi i artikullit direkt në rresht. */
-function ItemSearch({ items, prefs, stock, onPick }) {
+function ItemSearch({ items, prefs, stock, onPick, inputRef }) {
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
   const [hi, setHi] = useState(0)
@@ -481,6 +523,7 @@ function ItemSearch({ items, prefs, stock, onPick }) {
   return (
     <div className="picker ni-item-search" ref={ref}>
       <input
+        ref={inputRef}
         placeholder="Kërko artikullin…"
         value={q}
         onFocus={() => setOpen(true)}

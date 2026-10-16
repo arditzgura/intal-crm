@@ -72,7 +72,6 @@ export default function ClientProfilePage() {
           <div>
             <h1>
               {client.emri}
-              {client.rastesor && <span className="tag">Pakicë</span>}
               {client.arkivuar && <span className="tag muted-tag">Arkivuar</span>}
             </h1>
             <div className="muted">

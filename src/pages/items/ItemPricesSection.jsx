@@ -19,7 +19,7 @@ export default function ItemPricesSection({ item, readOnly }) {
 
   const byId = useMemo(() => Object.fromEntries(clients.map((c) => [c.id, c])), [clients])
   const options = useMemo(
-    () => clients.filter((c) => !c.arkivuar && !c.rastesor).map((c) => ({ id: c.id, label: `${c.kodi} – ${c.emri}`, sub: c.qyteti, search: [c.kodi, c.emri, c.qyteti] })),
+    () => clients.filter((c) => !c.arkivuar).map((c) => ({ id: c.id, label: `${c.kodi} – ${c.emri}`, sub: c.qyteti, search: [c.kodi, c.emri, c.qyteti] })),
     [clients],
   )
 

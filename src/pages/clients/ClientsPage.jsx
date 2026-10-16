@@ -106,7 +106,6 @@ export default function ClientsPage() {
                   <td className="mono">{c.kodi}</td>
                   <td>
                     <b>{c.emri}</b>
-                    {c.rastesor && <span className="tag">Pakicë</span>}
                     {c.arkivuar && <span className="tag muted-tag">Arkivuar</span>}
                   </td>
                   <td>{c.qyteti}</td>

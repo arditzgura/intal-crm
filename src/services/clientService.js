@@ -98,7 +98,7 @@ export async function ensureWalkInClient(actorName) {
   batch.set(ref, {
     ...EMPTY_CLIENT,
     emri: 'Klient Rastësor',
-    shenime: 'Klient i përhershëm për shitje me pakicë.',
+    shenime: 'Klient pa emër.',
     kodi: 'KL000',
     gjendje: {},
     fillestare: {},
