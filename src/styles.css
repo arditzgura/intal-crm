@@ -660,3 +660,19 @@ body.preview-open { overflow: hidden; }
 }
 
 .period-card { padding: 14px 16px; }
+
+/* Profili i klientit: kartat thelbësore */
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin: 6px 0 10px; }
+.kpi { position: relative; overflow: hidden; border-radius: 26px; padding: 22px 24px; box-shadow: 0 10px 26px rgba(15, 23, 42, 0.1); }
+.kpi > span { display: block; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 6px; position: relative; }
+.kpi-value { font-size: 2.3rem; font-weight: 900; letter-spacing: -1px; font-variant-numeric: tabular-nums; position: relative; line-height: 1.1; }
+.kpi-value small { font-size: 0.9rem; font-weight: 800; opacity: 0.5; letter-spacing: 0; }
+.kpi-sub { font-size: 0.75rem; margin-top: 6px; opacity: 0.75; position: relative; }
+.kpi-icon { position: absolute; right: 16px; top: 12px; opacity: 0.08; }
+.kpi-white { background: #fff; border: 1px solid #f1f5f9; color: #0f172a; }
+.kpi-white > span { color: #94a3b8; }
+.kpi-green { background: #f0fdf4; border: 1px solid #dcfce7; color: #059669; }
+.kpi-green > span { color: #059669; }
+.kpi-dark { background: #0f172a; color: #fff; }
+.kpi-dark > span { color: #818cf8; }
+.kpi-dark.credit > span { color: #6ee7b7; }

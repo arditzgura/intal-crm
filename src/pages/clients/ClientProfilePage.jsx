@@ -8,7 +8,8 @@ import { watchClientLedger } from '../../services/ledgerService'
 import { errorMessage } from '../../services/authService'
 import { CLIENT_TYPES, canEditClients, canLedger, canAdjustPoints, OTHER_MOVEMENTS } from '../../config/ledger'
 import { CURRENCIES, formatMoney } from '../../utils/money'
-import { formatDate, millis, periodRange } from '../../utils/date'
+import { formatDate, millis, periodLabel, periodRange } from '../../utils/date'
+import ClientKpis from './ClientKpis'
 import PeriodFilter, { defaultPeriod } from '../../components/PeriodFilter'
 import Balance from '../../components/Balance'
 import ClientFormModal from './ClientFormModal'
@@ -107,18 +108,7 @@ export default function ClientProfilePage() {
         </div>
         {client.shenime && <p className="notes">{client.shenime}</p>}
 
-        <div className="balance-cards">
-          {balances.map((c) => {
-            const v = client.gjendje?.[c] ?? 0
-            return (
-              <div key={c} className={`balance-card ${v > 0 ? 'debt' : v < 0 ? 'credit' : ''}`}>
-                <div className="balance-card-label">Gjendja {c}</div>
-                <div className="balance-card-value"><Balance value={v} currency={c} /></div>
-                <div className="balance-card-sub">{v > 0 ? 'DETYRIM – klienti na detyrohet' : v < 0 ? 'TEPRICË – i detyrohemi klientit' : 'Pa detyrim'}</div>
-              </div>
-            )
-          })}
-        </div>
+        <ClientKpis client={client} range={range} periodLabel={periodLabel(period)} />
         {canLedger(perms, 'gjendje_fillestare') && Object.keys(CURRENCIES).some((c) => !client.fillestare?.[c]) && (
           <button className="btn link small" onClick={() => setModal('gjendje_fillestare')}>
             + Vendos gjendjen fillestare
