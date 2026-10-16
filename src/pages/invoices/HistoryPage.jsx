@@ -19,6 +19,7 @@ import { formatDate, formatDateTime, fromInputDate, periodLabel, periodRange, to
 import { StatusBadge, ACTION_LABELS, CancelModal } from './InvoiceViewPage'
 import Modal from '../../components/Modal'
 import InvoicePreview from '../../components/invoice/InvoicePreview'
+import PeriodFilter, { defaultPeriod } from '../../components/PeriodFilter'
 
 
 export default function HistoryPage() {
@@ -40,7 +41,7 @@ export default function HistoryPage() {
 }
 
 /** Lista e faturave: periudha, kërkimi (nr. / klient / artikull), statusi; faqe nga serveri. */
-export function InvoiceList({ fixedClientId }) {
+export function InvoiceList({ fixedClientId, period: extPeriod, setPeriod: extSetPeriod }) {
   const navigate = useNavigate()
   const { perms, profile } = useAuth()
   const [modal, setModal] = useState(null)
@@ -49,7 +50,9 @@ export function InvoiceList({ fixedClientId }) {
   const { data: clients } = useLive(watchClients, [], { enabled: !fixedClientId, initial: [] })
   const { data: items } = useLive(watchItems, [], { initial: [] })
 
-  const [period, setPeriod] = useState({ kind: 'all', date: toInputDate(), month: toInputDate().slice(0, 7), year: String(new Date().getFullYear()) })
+  const [ownPeriod, setOwnPeriod] = useState(defaultPeriod)
+  const period = extPeriod ?? ownPeriod
+  const setPeriod = extSetPeriod ?? setOwnPeriod
   const [statusi, setStatusi] = useState('')
   const [qText, setQText] = useState('')
   const [q, setQ] = useState('')
@@ -116,27 +119,11 @@ export function InvoiceList({ fixedClientId }) {
 
   const totals = {}
   for (const r of rows.filter((x) => x.statusi !== 'anuluar' && x.statusi !== 'draft')) totals[r.monedha] = (totals[r.monedha] ?? 0) + r.totali
-  const years = Array.from({ length: new Date().getFullYear() - 2019 }, (_, i) => String(new Date().getFullYear() - i))
 
   return (
     <>
       <div className="card history-filters">
-        <div className="period-row">
-          <div className="period-tabs">
-            {PERIODS.map(([k, l]) => (
-              <button key={k} type="button" className={period.kind === k ? 'active' : ''} onClick={() => setPeriod((p) => ({ ...p, kind: k }))}>{l}</button>
-            ))}
-          </div>
-          {period.kind === 'date' && <input type="date" value={period.date} onChange={(e) => setPeriod((p) => ({ ...p, date: e.target.value }))} />}
-          {period.kind === 'month' && <input type="month" value={period.month} onChange={(e) => setPeriod((p) => ({ ...p, month: e.target.value }))} />}
-          {period.kind === 'year' && (
-            <select value={period.year} onChange={(e) => setPeriod((p) => ({ ...p, year: e.target.value }))}>
-              {years.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-          )}
-          <span className="grow" />
-          <div className="period-label"><span>Periudha</span><b>{label}</b></div>
-        </div>
+        {!extPeriod && <PeriodFilter period={period} setPeriod={setPeriod} />}
         <div className="search-row">
           <div className="search-box">
             <Search size={18} />
@@ -448,14 +435,6 @@ function PayInvoiceModal({ inv, actorName, onClose }) {
     </Modal>
   )
 }
-
-const PERIODS = [
-  ['all', 'Gjithë kohës'],
-  ['day', 'Ditore'],
-  ['date', 'Sipas ditës'],
-  ['month', 'Muaji'],
-  ['year', 'Viti'],
-]
 
 /** Çfarë kërkohet: numër fature, klientë ose artikuj (max 30 për Firestore "in"). */
 function resolveSearch(q, clients, items) {

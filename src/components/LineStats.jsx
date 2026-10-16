@@ -18,7 +18,7 @@ import { downloadCsv } from '../utils/csv'
  *  mode 'item':   klientët që e kanë blerë artikullin (field = itemId, group = clientId)
  * `names`: { id: { label, sub, link } } për kolonën e parë.
  */
-export default function LineStats({ mode, id, names, title }) {
+export default function LineStats({ mode, id, names, title, range }) {
   const { perms } = useAuth()
   const showProfit = canSeeCost(perms)
   const field = mode === 'client' ? 'clientId' : 'itemId'
@@ -34,11 +34,11 @@ export default function LineStats({ mode, id, names, title }) {
     () =>
       aggregateLines(lines, {
         groupBy,
-        from: from ? startOfDay(from) : null,
-        to: to ? endOfDay(to) : null,
+        from: range ? range.from : from ? startOfDay(from) : null,
+        to: range ? range.to : to ? endOfDay(to) : null,
         costs: showProfit ? { history, current } : null,
       }),
-    [lines, groupBy, from, to, showProfit, history, current],
+    [lines, groupBy, from, to, range, showProfit, history, current],
   )
 
   function exportCsv() {
@@ -79,8 +79,8 @@ export default function LineStats({ mode, id, names, title }) {
           <div className="stat-chip"><span>Fatura</span><b>{st.invoiceCount}</b></div>
         </div>
         <div className="filters-inline">
-          <label className="inline-field">Nga <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-          <label className="inline-field">Deri <input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+          {!range && <label className="inline-field">Nga <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>}
+          {!range && <label className="inline-field">Deri <input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>}
           <button className="btn small" onClick={exportCsv}><Download size={14} /> CSV</button>
         </div>
       </div>

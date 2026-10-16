@@ -658,3 +658,5 @@ body.preview-open { overflow: hidden; }
   body.printing-invoice.preview-open #root { display: none !important; }
   body.printing-invoice .preview-doc { overflow: visible; }
 }
+
+.period-card { padding: 14px 16px; }

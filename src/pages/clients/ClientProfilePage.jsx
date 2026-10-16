@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Wallet, Pencil, SlidersHorizontal, Archive, ArchiveRestore } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
@@ -8,13 +8,12 @@ import { watchClientLedger } from '../../services/ledgerService'
 import { errorMessage } from '../../services/authService'
 import { CLIENT_TYPES, canEditClients, canLedger, canAdjustPoints, OTHER_MOVEMENTS } from '../../config/ledger'
 import { CURRENCIES, formatMoney } from '../../utils/money'
-import { formatDate, millis } from '../../utils/date'
+import { formatDate, millis, periodRange } from '../../utils/date'
+import PeriodFilter, { defaultPeriod } from '../../components/PeriodFilter'
 import Balance from '../../components/Balance'
 import ClientFormModal from './ClientFormModal'
 import LedgerEntryModal from './LedgerEntryModal'
 import PointsModal from './PointsModal'
-import LedgerTab from './LedgerTab'
-import PaymentsTab from './PaymentsTab'
 import PointsTab from './PointsTab'
 import ClientPricesTab from './ClientPricesTab'
 import { InvoiceList } from '../invoices/HistoryPage'
@@ -22,8 +21,6 @@ import ClientPurchases from './ClientPurchases'
 import SupplierTab from './SupplierTab'
 
 const TABS = [
-  ['kartela', 'Kartela'],
-  ['pagesat', 'Pagesat'],
   ['faturat', 'Faturat'],
   ['blerjet', 'Artikujt e blerë'],
   ['piket', 'Pikët'],
@@ -34,7 +31,9 @@ export default function ClientProfilePage() {
   const { id } = useParams()
   const { perms, profile } = useAuth()
   const [params, setParams] = useSearchParams()
-  const tab = params.get('skeda') ?? 'kartela'
+  const tab = TABS.some(([k]) => k === params.get('skeda')) || params.get('skeda') === 'furnitori' ? params.get('skeda') : 'faturat'
+  const [period, setPeriod] = useState(defaultPeriod)
+  const range = useMemo(() => periodRange(period), [period])
   const [modal, setModal] = useState(null)
 
   const { data: client, loading, error } = useLive((ok, ko) => watchClient(id, ok, ko), [id])
@@ -136,13 +135,15 @@ export default function ClientProfilePage() {
       </div>
 
       {ledgerError && <div className="alert error">{errorMessage(ledgerError)}</div>}
-      {tab === 'kartela' && <LedgerTab client={client} ledger={ledger} />}
-      {tab === 'pagesat' && <PaymentsTab ledger={payments} />}
-      {tab === 'faturat' && <InvoiceList fixedClientId={client.id} />}
-      {tab === 'blerjet' && <ClientPurchases client={client} />}
+      {tab !== 'furnitori' && (
+        <div className="card period-card no-print"><PeriodFilter period={period} setPeriod={setPeriod} /></div>
+      )}
+      {tab === 'faturat' && <InvoiceList fixedClientId={client.id} period={period} setPeriod={setPeriod} />}
+      {tab === 'blerjet' && <ClientPurchases client={client} range={range} />}
       {tab === 'piket' && (
         <PointsTab
           client={client}
+          range={range}
           onAdjust={canAdjustPoints(perms) && !client.rastesor ? () => setModal('piket') : null}
         />
       )}

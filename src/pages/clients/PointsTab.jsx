@@ -2,10 +2,11 @@ import { useLive } from '../../hooks/useLive'
 import { watchClientPoints } from '../../services/pointsService'
 import { errorMessage } from '../../services/authService'
 import { POINT_TYPES } from '../../config/ledger'
-import { formatDateTime } from '../../utils/date'
+import { formatDateTime, millis } from '../../utils/date'
 
-export default function PointsTab({ client, onAdjust }) {
-  const { data: rows, error } = useLive((ok, ko) => watchClientPoints(client.id, ok, ko), [client.id], { initial: [] })
+export default function PointsTab({ client, onAdjust, range }) {
+  const { data: all, error } = useLive((ok, ko) => watchClientPoints(client.id, ok, ko), [client.id], { initial: [] })
+  const rows = all.filter((r) => (!range?.from || millis(r.krijuar) >= range.from.getTime()) && (!range?.to || millis(r.krijuar) <= range.to.getTime()))
 
   if (client.rastesor) return <div className="card muted">Klienti Rastësor nuk mbledh pikë.</div>
 
