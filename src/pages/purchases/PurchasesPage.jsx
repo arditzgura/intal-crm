@@ -9,6 +9,7 @@ import { errorMessage } from '../../services/authService'
 import { formatMoney } from '../../utils/money'
 import { endOfDay, formatDate, startOfDay } from '../../utils/date'
 import SearchPicker from '../../components/SearchPicker'
+import { useSort, SortTh } from '../../hooks/useSort'
 
 const EMPTY = { from: '', to: '', furnitorId: '', statusi: '' }
 
@@ -70,6 +71,16 @@ export function PurchaseList({ fixedSupplierId }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, page, fixedSupplierId])
 
+  const s = useSort(rows, {
+    nr: (r) => r.numri,
+    data: (r) => r.data,
+    origjina: (r) => r.origjinaEmri,
+    kategoria: (r) => r.kategoria,
+    blerje: (r) => r.totaliBlerje,
+    shitje: (r) => r.totaliShitje,
+    statusi: (r) => r.statusi,
+  })
+
   const apply = (e) => {
     e?.preventDefault()
     setPages([null])
@@ -105,19 +116,19 @@ export function PurchaseList({ fixedSupplierId }) {
           <table className="table clickable-rows">
             <thead>
               <tr>
-                <th>Nr.</th>
-                <th>Data</th>
-                <th>Origjina / furnitori</th>
-                <th>Kategoria</th>
-                <th className="num">Totali (blerje)</th>
-                <th className="num">Totali (shitje)</th>
-                <th>Statusi</th>
+                <SortTh s={s} k="nr">Nr.</SortTh>
+                <SortTh s={s} k="data">Data</SortTh>
+                <SortTh s={s} k="origjina">Origjina / furnitori</SortTh>
+                <SortTh s={s} k="kategoria">Kategoria</SortTh>
+                <SortTh s={s} k="blerje" className="num">Totali (blerje)</SortTh>
+                <SortTh s={s} k="shitje" className="num">Totali (shitje)</SortTh>
+                <SortTh s={s} k="statusi">Statusi</SortTh>
               </tr>
             </thead>
             <tbody>
               {loading && <tr><td colSpan={7} className="muted">Duke u ngarkuar…</td></tr>}
               {!loading && !rows.length && <tr><td colSpan={7} className="muted">Asnjë hyrje malli.</td></tr>}
-              {!loading && rows.map((r) => (
+              {!loading && s.sorted.map((r) => (
                 <tr key={r.id} onClick={() => navigate(`/blerje/${r.id}`)} className={r.statusi === 'anuluar' ? 'archived' : ''}>
                   <td className="mono">{r.numriTekst}</td>
                   <td>{formatDate(r.data)}</td>

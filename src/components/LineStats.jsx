@@ -11,6 +11,7 @@ import { canSeeCost } from '../config/roles'
 import { formatMoney } from '../utils/money'
 import { endOfDay, formatDate, startOfDay } from '../utils/date'
 import { downloadCsv } from '../utils/csv'
+import { useSort, SortTh } from '../hooks/useSort'
 
 /**
  * Statistikat e shitjeve nga rreshtat e faturave.
@@ -40,6 +41,16 @@ export default function LineStats({ mode, id, names, title, range }) {
       }),
     [lines, groupBy, from, to, range, showProfit, history, current],
   )
+
+  const s = useSort(st.rows, {
+    emri: (r) => names[r.key]?.label ?? r.key,
+    sasia: (r) => r.sasia,
+    mesatar: (r) => r.cmimiMesatar,
+    totali: (r) => r.totalLek,
+    fitimi: (r) => (r.fitimiIPlote ? r.fitimi : null),
+    fatura: (r) => r.fatura,
+    fundit: (r) => r.eFundit,
+  })
 
   function exportCsv() {
     downloadCsv(
@@ -89,19 +100,19 @@ export default function LineStats({ mode, id, names, title, range }) {
         <table className="table">
           <thead>
             <tr>
-              <th>{mode === 'client' ? 'Artikulli' : 'Klienti'}</th>
-              <th className="num">Sasia</th>
-              <th className="num">Çmimi mesatar</th>
-              <th className="num">Totali</th>
-              {showProfit && <th className="num">Fitimi (LEK)</th>}
-              <th className="num">Fatura</th>
-              <th>E fundit</th>
+              <SortTh s={s} k="emri">{mode === 'client' ? 'Artikulli' : 'Klienti'}</SortTh>
+              <SortTh s={s} k="sasia" className="num">Sasia</SortTh>
+              <SortTh s={s} k="mesatar" className="num">Çmimi mesatar</SortTh>
+              <SortTh s={s} k="totali" className="num">Totali</SortTh>
+              {showProfit && <SortTh s={s} k="fitimi" className="num">Fitimi (LEK)</SortTh>}
+              <SortTh s={s} k="fatura" className="num">Fatura</SortTh>
+              <SortTh s={s} k="fundit">E fundit</SortTh>
             </tr>
           </thead>
           <tbody>
             {loading && <tr><td colSpan={7} className="muted">Duke u ngarkuar…</td></tr>}
             {!loading && !st.rows.length && <tr><td colSpan={7} className="muted">Asnjë shitje{from || to ? ' në këtë periudhë' : ''}.</td></tr>}
-            {st.rows.map((r) => {
+            {s.sorted.map((r) => {
               const n = names[r.key]
               return (
                 <tr key={`${r.key}|${r.monedha}`}>

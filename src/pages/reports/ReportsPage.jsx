@@ -16,6 +16,7 @@ import { canSeeCost } from '../../config/roles'
 import { formatMoney, toLek } from '../../utils/money'
 import { endOfDay, formatDate, millis, startOfDay, toInputDate } from '../../utils/date'
 import { downloadCsv } from '../../utils/csv'
+import { useSort, SortTh } from '../../hooks/useSort'
 
 const REPORTS = [
   ['shitjet', 'Shitjet'],
@@ -167,6 +168,7 @@ function SalesReport() {
 
   const totalLek = L.lines.reduce((s, l) => s + toLek(l.totali, l.kursi), 0)
   const invoices = new Set(L.lines.map((l) => l.invoiceId)).size
+  const ss = useSort(rows, { emri: (r) => groupLabel(r.key, by, cById, iById), monedha: (r) => r.monedha, sasia: (r) => r.sasia, totali: (r) => (orig ? r.totali : r.lek), lek: (r) => r.lek, fatura: (r) => r.fatura })
 
   return (
     <>
@@ -189,11 +191,11 @@ function SalesReport() {
       <div className="card no-pad">
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>#</th><th>{GROUP_LABELS[by]}</th>{orig && <th>Monedha</th>}<th className="num">Sasia</th><th className="num">{orig ? 'Totali' : 'Totali (LEK)'}</th>{orig && <th className="num">Në LEK</th>}<th className="num">Fatura</th><th className="num">%</th></tr></thead>
+            <thead><tr><th>#</th><SortTh s={ss} k="emri">{GROUP_LABELS[by]}</SortTh>{orig && <SortTh s={ss} k="monedha">Monedha</SortTh>}<SortTh s={ss} k="sasia" className="num">Sasia</SortTh><SortTh s={ss} k="totali" className="num">{orig ? 'Totali' : 'Totali (LEK)'}</SortTh>{orig && <SortTh s={ss} k="lek" className="num">Në LEK</SortTh>}<SortTh s={ss} k="fatura" className="num">Fatura</SortTh><SortTh s={ss} k="lek" className="num">%</SortTh></tr></thead>
             <tbody>
               {L.loading && <tr><td colSpan={8} className="muted">Duke u ngarkuar…</td></tr>}
               {!L.loading && !rows.length && <tr><td colSpan={8} className="muted">Asnjë shitje në këtë periudhë.</td></tr>}
-              {!L.loading && rows.map((r, i) => {
+              {!L.loading && ss.sorted.map((r, i) => {
                 const link = groupLink(r.key, by)
                 const label = groupLabel(r.key, by, cById, iById)
                 return (
@@ -245,6 +247,7 @@ function ProfitReport() {
     return { rows: by === 'muaji' ? arr.sort((a, b) => b.key.localeCompare(a.key)) : arr.sort((a, b) => b.fitimi - a.fitimi), tot }
   }, [L.lines, by, history, current, cById, iById])
 
+  const fsort = useSort(rows, { emri: (r) => groupLabel(r.key, by, cById, iById), sasia: (r) => r.sasia, shitje: (r) => r.shitje, kosto: (r) => r.kosto, fitimi: (r) => r.fitimi, marzhi: (r) => (r.shitje - r.paKosto ? r.fitimi / (r.shitje - r.paKosto) : null) })
   const fitimi = tot.shitje - tot.pa - tot.kosto
   const marzh = tot.shitje - tot.pa ? Math.round((fitimi * 1000) / (tot.shitje - tot.pa)) / 10 : 0
 
@@ -268,10 +271,10 @@ function ProfitReport() {
       <div className="card no-pad">
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>{GROUP_LABELS[by]}</th><th className="num">Sasia</th><th className="num">Shitje</th><th className="num">Kosto</th><th className="num">Fitimi</th><th className="num">Marzhi</th></tr></thead>
+            <thead><tr><SortTh s={fsort} k="emri">{GROUP_LABELS[by]}</SortTh><SortTh s={fsort} k="sasia" className="num">Sasia</SortTh><SortTh s={fsort} k="shitje" className="num">Shitje</SortTh><SortTh s={fsort} k="kosto" className="num">Kosto</SortTh><SortTh s={fsort} k="fitimi" className="num">Fitimi</SortTh><SortTh s={fsort} k="marzhi" className="num">Marzhi</SortTh></tr></thead>
             <tbody>
               {L.loading && <tr><td colSpan={6} className="muted">Duke u ngarkuar…</td></tr>}
-              {!L.loading && rows.map((r) => {
+              {!L.loading && fsort.sorted.map((r) => {
                 const link = groupLink(r.key, by)
                 const label = groupLabel(r.key, by, cById, iById)
                 const base = r.shitje - r.paKosto
@@ -345,6 +348,7 @@ function AgingReport() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
+  const as = useSort(rows, { klienti: (r) => r.client.emri, qyteti: (r) => r.client.qyteti, borxhi: (r) => r.borxhi, b0: (r) => r.b0 || null, b31: (r) => r.b31 || null, b60: (r) => r.b60 || null })
   const totals = {}
   for (const r of rows) {
     const t = (totals[r.monedha] ??= { borxhi: 0, b0: 0, b31: 0, b60: 0 })
@@ -370,11 +374,11 @@ function AgingReport() {
       <div className="card no-pad">
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Klienti</th><th>Qyteti</th><th className="num">Borxhi</th>{BUCKETS.map(([k, l]) => <th key={k} className="num">{l}</th>)}</tr></thead>
+            <thead><tr><SortTh s={as} k="klienti">Klienti</SortTh><SortTh s={as} k="qyteti">Qyteti</SortTh><SortTh s={as} k="borxhi" className="num">Borxhi</SortTh>{BUCKETS.map(([k, l]) => <SortTh key={k} s={as} k={k} className="num">{l}</SortTh>)}</tr></thead>
             <tbody>
               {loading && <tr><td colSpan={6} className="muted">Duke llogaritur…</td></tr>}
               {!loading && !rows.length && <tr><td colSpan={6} className="muted">Asnjë klient me borxh.</td></tr>}
-              {!loading && rows.map((r) => (
+              {!loading && as.sorted.map((r) => (
                 <tr key={`${r.client.id}${r.monedha}`}>
                   <td><Link to={`/kliente/${r.client.id}`}>{r.client.kodi} – {r.client.emri}</Link></td>
                   <td>{r.client.qyteti}</td>
@@ -470,6 +474,7 @@ function InventoryReport() {
     byCat.set(k, r)
   }
   const rows = [...byCat.values()].sort((a, b) => b.shitje - a.shitje)
+  const is = useSort(rows, { kategoria: (r) => r.kategoria, artikuj: (r) => r.artikuj, sasia: (r) => r.sasia, kosto: (r) => r.kosto, shitje: (r) => r.shitje })
   const tot = rows.reduce((s, r) => ({ sasia: s.sasia + r.sasia, kosto: s.kosto + r.kosto, shitje: s.shitje + r.shitje }), { sasia: 0, kosto: 0, shitje: 0 })
 
   return (
@@ -486,9 +491,9 @@ function InventoryReport() {
       <div className="card no-pad">
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Kategoria</th><th className="num">Artikuj</th><th className="num">Sasia</th>{showCost && <th className="num">Vlera (kosto)</th>}<th className="num">Vlera (shitje)</th></tr></thead>
+            <thead><tr><SortTh s={is} k="kategoria">Kategoria</SortTh><SortTh s={is} k="artikuj" className="num">Artikuj</SortTh><SortTh s={is} k="sasia" className="num">Sasia</SortTh>{showCost && <SortTh s={is} k="kosto" className="num">Vlera (kosto)</SortTh>}<SortTh s={is} k="shitje" className="num">Vlera (shitje)</SortTh></tr></thead>
             <tbody>
-              {rows.map((r) => (
+              {is.sorted.map((r) => (
                 <tr key={r.kategoria}>
                   <td>{r.kategoria}</td>
                   <td className="num">{r.artikuj}</td>

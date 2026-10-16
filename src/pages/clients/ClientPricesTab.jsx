@@ -7,6 +7,7 @@ import { errorMessage } from '../../services/authService'
 import { canEditItems } from '../../config/ledger'
 import { formatMoney, parseMoney } from '../../utils/money'
 import SearchPicker from '../../components/SearchPicker'
+import { useSort, SortTh } from '../../hooks/useSort'
 
 /** Çmimet preferenciale të një klienti (çmimet janë në LEK). */
 export default function ClientPricesTab({ client }) {
@@ -26,6 +27,14 @@ export default function ClientPricesTab({ client }) {
   const rows = prices
     .map((p) => ({ ...p, item: byId[p.itemId] }))
     .sort((a, b) => (a.item?.emri ?? '').localeCompare(b.item?.emri ?? '', 'sq'))
+
+  const s = useSort(rows, {
+    kodi: (p) => p.item?.kodi,
+    emri: (p) => p.item?.emri,
+    standard: (p) => p.item?.cmimi,
+    pref: (p) => p.cmimi,
+    zbritja: (p) => (p.item?.cmimi ? (p.item.cmimi - p.cmimi) / p.item.cmimi : null),
+  })
 
   async function add(e) {
     e.preventDefault()
@@ -58,16 +67,16 @@ export default function ClientPricesTab({ client }) {
         <table className="table">
           <thead>
             <tr>
-              <th>Kodi</th>
-              <th>Artikulli</th>
-              <th className="num">Çmimi standard</th>
-              <th className="num">Çmimi preferencial</th>
-              <th className="num">Zbritja</th>
+              <SortTh s={s} k="kodi">Kodi</SortTh>
+              <SortTh s={s} k="emri">Artikulli</SortTh>
+              <SortTh s={s} k="standard" className="num">Çmimi standard</SortTh>
+              <SortTh s={s} k="pref" className="num">Çmimi preferencial</SortTh>
+              <SortTh s={s} k="zbritja" className="num">Zbritja</SortTh>
               {editable && <th />}
             </tr>
           </thead>
           <tbody>
-            {rows.map((p) => {
+            {s.sorted.map((p) => {
               const std = p.item?.cmimi ?? 0
               const pct = std ? Math.round(((std - p.cmimi) * 1000) / std) / 10 : 0
               return (

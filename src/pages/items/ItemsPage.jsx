@@ -12,6 +12,7 @@ import { canEditItems } from '../../config/ledger'
 import { formatMoney } from '../../utils/money'
 import { matchesSearch } from '../../utils/text'
 import Pagination, { usePaged } from '../../components/Pagination'
+import { useSort, SortTh } from '../../hooks/useSort'
 import ItemFormModal from './ItemFormModal'
 
 export default function ItemsPage() {
@@ -38,11 +39,20 @@ export default function ItemsPage() {
         .filter((i) => showArchived || !i.arkivuar)
         .filter((i) => !kat || i.kategoria === kat)
         .filter((i) => !nen || i.nenkategoria === nen)
-        .filter((i) => matchesSearch(q, i.kodi, i.emri, i.kategoria, i.nenkategoria))
-        .sort((a, b) => (a.kodi || '').localeCompare(b.kodi || '', 'sq', { numeric: true })),
+        .filter((i) => matchesSearch(q, i.kodi, i.emri, i.kategoria, i.nenkategoria)),
     [items, q, kat, nen, showArchived],
   )
-  const paged = usePaged(filtered, `${q}|${kat}|${nen}|${showArchived}`)
+  const s = useSort(filtered, {
+    kodi: (i) => i.kodi,
+    emri: (i) => i.emri,
+    kategoria: (i) => [i.kategoria, i.nenkategoria].filter(Boolean).join(' / '),
+    njesia: (i) => i.njesia,
+    cmimi: (i) => i.cmimi,
+    kosto: (i) => costs[i.id],
+    stoku: (i) => stock[i.id] ?? 0,
+    min: (i) => i.stokMinimal || null,
+  }, { key: 'kodi', dir: 'asc' })
+  const paged = usePaged(s.sorted, `${q}|${kat}|${nen}|${showArchived}|${s.sort?.key}|${s.sort?.dir}`)
 
   return (
     <div>
@@ -78,14 +88,14 @@ export default function ItemsPage() {
           <table className="table clickable-rows">
             <thead>
               <tr>
-                <th>Kodi</th>
-                <th>Emri</th>
-                <th>Kategoria</th>
-                <th>Njësia</th>
-                <th className="num">Çmimi i shitjes</th>
-                {showCost && <th className="num">Kosto</th>}
-                <th className="num">Stoku</th>
-                <th className="num">Stok min.</th>
+                <SortTh s={s} k="kodi">Kodi</SortTh>
+                <SortTh s={s} k="emri">Emri</SortTh>
+                <SortTh s={s} k="kategoria">Kategoria</SortTh>
+                <SortTh s={s} k="njesia">Njësia</SortTh>
+                <SortTh s={s} k="cmimi" className="num">Çmimi i shitjes</SortTh>
+                {showCost && <SortTh s={s} k="kosto" className="num">Kosto</SortTh>}
+                <SortTh s={s} k="stoku" className="num">Stoku</SortTh>
+                <SortTh s={s} k="min" className="num">Stok min.</SortTh>
               </tr>
             </thead>
             <tbody>

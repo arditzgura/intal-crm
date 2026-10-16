@@ -8,14 +8,9 @@ import { errorMessage } from '../../services/authService'
 import { CLIENT_TYPES, canEditClients } from '../../config/ledger'
 import { matchesSearch } from '../../utils/text'
 import Pagination, { usePaged } from '../../components/Pagination'
+import { useSort, SortTh } from '../../hooks/useSort'
 import Balance from '../../components/Balance'
 import ClientFormModal from './ClientFormModal'
-
-const SORTS = {
-  emri: { label: 'Emri', fn: (a, b) => a.emri.localeCompare(b.emri, 'sq') },
-  kodi: { label: 'Kodi', fn: (a, b) => (a.kodi || '').localeCompare(b.kodi || '', 'sq', { numeric: true }) },
-  borxhi: { label: 'Borxhi (LEK)', fn: (a, b) => (b.gjendje?.LEK ?? 0) - (a.gjendje?.LEK ?? 0) },
-}
 
 export default function ClientsPage() {
   const { perms, profile } = useAuth()
@@ -23,7 +18,6 @@ export default function ClientsPage() {
   const { data: clients, loading, error } = useLive(watchClients, [], { initial: [] })
   const [q, setQ] = useState('')
   const [tipi, setTipi] = useState('')
-  const [sort, setSort] = useState('emri')
   const [showArchived, setShowArchived] = useState(false)
   const [creating, setCreating] = useState(false)
   const editable = canEditClients(perms)
@@ -37,11 +31,20 @@ export default function ClientsPage() {
       clients
         .filter((c) => (showArchived ? true : !c.arkivuar))
         .filter((c) => !tipi || c.tipi === tipi || (c.tipi === 'te_dyja' && tipi !== ''))
-        .filter((c) => matchesSearch(q, c.emri, c.kodi, c.qyteti, c.telefoni, c.nipt))
-        .sort(SORTS[sort].fn),
-    [clients, q, tipi, sort, showArchived],
+        .filter((c) => matchesSearch(q, c.emri, c.kodi, c.qyteti, c.telefoni, c.nipt)),
+    [clients, q, tipi, showArchived],
   )
-  const paged = usePaged(filtered, `${q}|${tipi}|${sort}|${showArchived}`)
+  const s = useSort(filtered, {
+    kodi: (c) => c.kodi,
+    emri: (c) => c.emri,
+    qyteti: (c) => c.qyteti,
+    telefoni: (c) => c.telefoni,
+    tipi: (c) => CLIENT_TYPES[c.tipi],
+    LEK: (c) => c.gjendje?.LEK ?? 0,
+    EUR: (c) => c.gjendje?.EUR ?? 0,
+    USD: (c) => c.gjendje?.USD ?? 0,
+  }, { key: 'emri', dir: 'asc' })
+  const paged = usePaged(s.sorted, `${q}|${tipi}|${s.sort?.key}|${s.sort?.dir}|${showArchived}`)
 
   const currencies = ['LEK', ...['EUR', 'USD'].filter((c) => clients.some((x) => x.gjendje?.[c]))]
   const totals = Object.fromEntries(
@@ -67,11 +70,6 @@ export default function ClientsPage() {
             <option key={k} value={k}>{v}</option>
           ))}
         </select>
-        <select value={sort} onChange={(e) => setSort(e.target.value)}>
-          {Object.entries(SORTS).map(([k, v]) => (
-            <option key={k} value={k}>Rendit: {v.label}</option>
-          ))}
-        </select>
         <label className="check">
           <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> Të arkivuarit
         </label>
@@ -84,13 +82,13 @@ export default function ClientsPage() {
           <table className="table clickable-rows">
             <thead>
               <tr>
-                <th>Kodi</th>
-                <th>Emri / Biznesi</th>
-                <th>Qyteti</th>
-                <th>Telefoni</th>
-                <th>Tipi</th>
+                <SortTh s={s} k="kodi">Kodi</SortTh>
+                <SortTh s={s} k="emri">Emri / Biznesi</SortTh>
+                <SortTh s={s} k="qyteti">Qyteti</SortTh>
+                <SortTh s={s} k="telefoni">Telefoni</SortTh>
+                <SortTh s={s} k="tipi">Tipi</SortTh>
                 {currencies.map((c) => (
-                  <th key={c} className="num">Gjendja {c}</th>
+                  <SortTh key={c} s={s} k={c} className="num">Gjendja {c}</SortTh>
                 ))}
               </tr>
             </thead>

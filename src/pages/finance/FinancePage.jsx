@@ -13,6 +13,7 @@ import { CURRENCIES, formatMoney } from '../../utils/money'
 import { endOfDay, formatDate, startOfDay, toInputDate } from '../../utils/date'
 import { downloadCsv } from '../../utils/csv'
 import { ExpenseModal, SupplierPaymentModal, CashAdjustModal, TransferModal, CancelReasonModal } from './FinanceModals'
+import { useSort, SortTh } from '../../hooks/useSort'
 
 const TABS = [
   ['permbledhje', 'Përmbledhja'],
@@ -194,6 +195,8 @@ function CashFlowTab() {
     t.dalje += v.dalje
   }
   const label = (k) => (by === 'day' ? formatDate(new Date(k)) : k.split('-').reverse().join('/'))
+  const flat = keys.flatMap((k) => Object.entries(flow[k]).map(([m, v]) => ({ k, m, ...v, neto: v.hyrje - v.dalje })))
+  const fs = useSort(flat, { periudha: (r) => r.k, monedha: (r) => r.m, hyrje: (r) => r.hyrje, dalje: (r) => r.dalje, neto: (r) => r.neto })
 
   function exportCsv() {
     const rows = []
@@ -228,19 +231,19 @@ function CashFlowTab() {
       <div className="card no-pad">
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Periudha</th><th>Monedha</th><th className="num">Hyrje</th><th className="num">Dalje</th><th className="num">Neto</th></tr></thead>
+            <thead><tr><SortTh s={fs} k="periudha">Periudha</SortTh><SortTh s={fs} k="monedha">Monedha</SortTh><SortTh s={fs} k="hyrje" className="num">Hyrje</SortTh><SortTh s={fs} k="dalje" className="num">Dalje</SortTh><SortTh s={fs} k="neto" className="num">Neto</SortTh></tr></thead>
             <tbody>
               {p.loading && <tr><td colSpan={5} className="muted">Duke u ngarkuar…</td></tr>}
               {!p.loading && !keys.length && <tr><td colSpan={5} className="muted">Asnjë lëvizje në këtë periudhë.</td></tr>}
-              {!p.loading && keys.flatMap((k) => Object.entries(flow[k]).map(([m, v]) => (
-                <tr key={`${k}${m}`}>
-                  <td>{label(k)}</td>
-                  <td>{m}</td>
-                  <td className="num pos">{formatMoney(v.hyrje)}</td>
-                  <td className="num neg">{formatMoney(v.dalje)}</td>
-                  <td className="num"><b>{formatMoney(v.hyrje - v.dalje)}</b></td>
+              {!p.loading && fs.sorted.map((r) => (
+                <tr key={`${r.k}${r.m}`}>
+                  <td>{label(r.k)}</td>
+                  <td>{r.m}</td>
+                  <td className="num pos">{formatMoney(r.hyrje)}</td>
+                  <td className="num neg">{formatMoney(r.dalje)}</td>
+                  <td className="num"><b>{formatMoney(r.neto)}</b></td>
                 </tr>
-              )))}
+              ))}
             </tbody>
           </table>
         </div>
@@ -256,6 +259,7 @@ function RegisterTab() {
   const [monedha, setMonedha] = useState('')
   const [tipi, setTipi] = useState('')
   const rows = p.rows.filter((r) => (!llogaria || r.llogaria === llogaria) && (!monedha || r.monedha === monedha) && (!tipi || r.tipi === tipi))
+  const rs = useSort(rows, { data: (r) => r.data, llogaria: (r) => ACCOUNTS[r.llogaria], lloji: (r) => CASH_TYPES[r.tipi] ?? r.tipi, shenim: (r) => r.shenim, shuma: (r) => r.shuma, perdoruesi: (r) => r.emri })
 
   function exportCsv() {
     downloadCsv(`regjistri_arkes_${p.period.from}_${p.period.to}.csv`, ['Data', 'Llogaria', 'Lloji', 'Shënim', 'Monedha', 'Shuma', 'Përdoruesi'],
@@ -284,11 +288,11 @@ function RegisterTab() {
       <div className="card no-pad">
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Data</th><th>Llogaria</th><th>Lloji</th><th>Shënim</th><th className="num">Shuma</th><th>Përdoruesi</th></tr></thead>
+            <thead><tr><SortTh s={rs} k="data">Data</SortTh><SortTh s={rs} k="llogaria">Llogaria</SortTh><SortTh s={rs} k="lloji">Lloji</SortTh><SortTh s={rs} k="shenim">Shënim</SortTh><SortTh s={rs} k="shuma" className="num">Shuma</SortTh><SortTh s={rs} k="perdoruesi">Përdoruesi</SortTh></tr></thead>
             <tbody>
               {p.loading && <tr><td colSpan={6} className="muted">Duke u ngarkuar…</td></tr>}
               {!p.loading && !rows.length && <tr><td colSpan={6} className="muted">Asnjë lëvizje.</td></tr>}
-              {!p.loading && rows.map((r) => (
+              {!p.loading && rs.sorted.map((r) => (
                 <tr key={r.id}>
                   <td>{formatDate(r.data)}</td>
                   <td>{ACCOUNTS[r.llogaria]}</td>
@@ -313,6 +317,7 @@ function ExpensesTab() {
   const p = usePeriod(queryExpenses)
   const [cancelling, setCancelling] = useState(null)
   const active = p.rows.filter((r) => r.statusi === 'aktiv')
+  const es = useSort(p.rows, { data: (r) => r.data, kategoria: (r) => r.kategoria, shenim: (r) => r.shenim, llogaria: (r) => ACCOUNTS[r.llogaria], shuma: (r) => r.shuma })
   const byCat = {}
   for (const r of active) {
     const k = `${r.kategoria}|${r.monedha}`
@@ -337,11 +342,11 @@ function ExpensesTab() {
       <div className="card no-pad">
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Data</th><th>Kategoria</th><th>Shënim</th><th>Llogaria</th><th className="num">Shuma</th><th /></tr></thead>
+            <thead><tr><SortTh s={es} k="data">Data</SortTh><SortTh s={es} k="kategoria">Kategoria</SortTh><SortTh s={es} k="shenim">Shënim</SortTh><SortTh s={es} k="llogaria">Llogaria</SortTh><SortTh s={es} k="shuma" className="num">Shuma</SortTh><th /></tr></thead>
             <tbody>
               {p.loading && <tr><td colSpan={6} className="muted">Duke u ngarkuar…</td></tr>}
               {!p.loading && !p.rows.length && <tr><td colSpan={6} className="muted">Asnjë shpenzim në këtë periudhë.</td></tr>}
-              {!p.loading && p.rows.map((r) => (
+              {!p.loading && es.sorted.map((r) => (
                 <tr key={r.id} className={r.statusi === 'anuluar' ? 'archived' : ''}>
                   <td>{formatDate(r.data)}</td>
                   <td>{r.kategoria}</td>
@@ -375,6 +380,7 @@ function SupplierPaymentsTab() {
   const { perms, profile } = useAuth()
   const p = usePeriod(querySupplierPayments)
   const [cancelling, setCancelling] = useState(null)
+  const ps = useSort(p.rows, { data: (r) => r.data, furnitori: (r) => r.furnitor, shenim: (r) => r.shenim, llogaria: (r) => ACCOUNTS[r.llogaria], shuma: (r) => r.shuma })
   return (
     <>
       <div className="card filters">{p.form}</div>
@@ -382,11 +388,11 @@ function SupplierPaymentsTab() {
       <div className="card no-pad">
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Data</th><th>Furnitori</th><th>Shënim</th><th>Llogaria</th><th className="num">Shuma</th><th /></tr></thead>
+            <thead><tr><SortTh s={ps} k="data">Data</SortTh><SortTh s={ps} k="furnitori">Furnitori</SortTh><SortTh s={ps} k="shenim">Shënim</SortTh><SortTh s={ps} k="llogaria">Llogaria</SortTh><SortTh s={ps} k="shuma" className="num">Shuma</SortTh><th /></tr></thead>
             <tbody>
               {p.loading && <tr><td colSpan={6} className="muted">Duke u ngarkuar…</td></tr>}
               {!p.loading && !p.rows.length && <tr><td colSpan={6} className="muted">Asnjë pagesë në këtë periudhë.</td></tr>}
-              {!p.loading && p.rows.map((r) => (
+              {!p.loading && ps.sorted.map((r) => (
                 <tr key={r.id} className={r.statusi === 'anuluar' ? 'archived' : ''}>
                   <td>{formatDate(r.data)}</td>
                   <td><Link to={`/kliente/${r.clientId}?skeda=furnitori`}>{r.furnitor}</Link></td>

@@ -3,10 +3,13 @@ import { watchClientPoints } from '../../services/pointsService'
 import { errorMessage } from '../../services/authService'
 import { POINT_TYPES } from '../../config/ledger'
 import { formatDateTime, millis } from '../../utils/date'
+import { useSort, SortTh } from '../../hooks/useSort'
 
 export default function PointsTab({ client, onAdjust, range }) {
   const { data: all, error } = useLive((ok, ko) => watchClientPoints(client.id, ok, ko), [client.id], { initial: [] })
   const rows = all.filter((r) => (!range?.from || millis(r.krijuar) >= range.from.getTime()) && (!range?.to || millis(r.krijuar) <= range.to.getTime()))
+
+  const s = useSort(rows, { koha: (r) => r.krijuar, lloji: (r) => POINT_TYPES[r.tipi] ?? r.tipi, pike: (r) => r.pike, pas: (r) => r.piketPas, arsye: (r) => r.arsye, nga: (r) => r.emri })
 
   if (client.rastesor) return <div className="card muted">Klienti Rastësor nuk mbledh pikë.</div>
 
@@ -21,16 +24,16 @@ export default function PointsTab({ client, onAdjust, range }) {
         <table className="table">
           <thead>
             <tr>
-              <th>Koha</th>
-              <th>Lloji</th>
-              <th className="num">Pikë</th>
-              <th className="num">Pas</th>
-              <th>Arsyeja</th>
-              <th>Nga</th>
+              <SortTh s={s} k="koha">Koha</SortTh>
+              <SortTh s={s} k="lloji">Lloji</SortTh>
+              <SortTh s={s} k="pike" className="num">Pikë</SortTh>
+              <SortTh s={s} k="pas" className="num">Pas</SortTh>
+              <SortTh s={s} k="arsye">Arsyeja</SortTh>
+              <SortTh s={s} k="nga">Nga</SortTh>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {s.sorted.map((r) => (
               <tr key={r.id}>
                 <td>{formatDateTime(r.krijuar)}</td>
                 <td>{POINT_TYPES[r.tipi] ?? r.tipi}</td>

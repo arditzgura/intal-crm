@@ -14,6 +14,7 @@ import { matchesSearch } from '../../utils/text'
 import { downloadCsv } from '../../utils/csv'
 import Pagination, { usePaged } from '../../components/Pagination'
 import Modal from '../../components/Modal'
+import { useSort, SortTh } from '../../hooks/useSort'
 
 export default function InventoryPage() {
   const { perms } = useAuth()
@@ -78,7 +79,16 @@ function StockTab() {
         .sort((a, b) => (a.kodi || '').localeCompare(b.kodi || '', 'sq', { numeric: true })),
     [items, stock, costs, q, kat, only],
   )
-  const paged = usePaged(rows, `${q}|${kat}|${only}`)
+  const s = useSort(rows, {
+    kodi: (r) => r.kodi,
+    emri: (r) => r.emri,
+    kategoria: (r) => [r.kategoria, r.nenkategoria].filter(Boolean).join(' / '),
+    stoku: (r) => r.sasia,
+    min: (r) => r.stokMinimal || null,
+    kosto: (r) => r.vleraKosto,
+    shitje: (r) => r.vleraShitje,
+  }, { key: 'kodi', dir: 'asc' })
+  const paged = usePaged(s.sorted, `${q}|${kat}|${only}|${s.sort?.key}|${s.sort?.dir}`)
   const totalCost = rows.reduce((s, r) => s + (r.vleraKosto ?? 0), 0)
   const totalSale = rows.reduce((s, r) => s + r.vleraShitje, 0)
   const lowCount = rows.filter((r) => r.nenMin).length
@@ -137,13 +147,13 @@ function StockTab() {
           <table className="table">
             <thead>
               <tr>
-                <th>Kodi</th>
-                <th>Artikulli</th>
-                <th>Kategoria</th>
-                <th className="num">Stoku</th>
-                <th className="num">Stok min.</th>
-                {showCost && <th className="num">Vlera (kosto)</th>}
-                <th className="num">Vlera (shitje)</th>
+                <SortTh s={s} k="kodi">Kodi</SortTh>
+                <SortTh s={s} k="emri">Artikulli</SortTh>
+                <SortTh s={s} k="kategoria">Kategoria</SortTh>
+                <SortTh s={s} k="stoku" className="num">Stoku</SortTh>
+                <SortTh s={s} k="min" className="num">Stok min.</SortTh>
+                {showCost && <SortTh s={s} k="kosto" className="num">Vlera (kosto)</SortTh>}
+                <SortTh s={s} k="shitje" className="num">Vlera (shitje)</SortTh>
                 {perms.has('inventar_rregullim') && <th />}
               </tr>
             </thead>
@@ -250,6 +260,7 @@ function CountSheet() {
     () => items.filter((i) => !i.arkivuar && matchesSearch(q, i.kodi, i.emri, i.kategoria)).sort((a, b) => (a.kodi || '').localeCompare(b.kodi || '', 'sq', { numeric: true })),
     [items, q],
   )
+  const cs = useSort(list, { kodi: (i) => i.kodi, emri: (i) => i.emri, sistem: (i) => stock[i.id] ?? 0 }, { key: 'kodi', dir: 'asc' })
   const changes = Object.entries(counts)
     .filter(([, v]) => v !== '' && Number.isInteger(Number(v)))
     .map(([itemId, v]) => ({ itemId, aktuale: stock[itemId] ?? 0, numeruar: Number(v) }))
@@ -291,10 +302,10 @@ function CountSheet() {
         <div className="table-wrap">
           <table className="table">
             <thead>
-              <tr><th>Kodi</th><th>Artikulli</th><th className="num">Në sistem</th><th className="num">E numëruar</th><th className="num">Diferenca</th></tr>
+              <tr><SortTh s={cs} k="kodi">Kodi</SortTh><SortTh s={cs} k="emri">Artikulli</SortTh><SortTh s={cs} k="sistem" className="num">Në sistem</SortTh><th className="num">E numëruar</th><th className="num">Diferenca</th></tr>
             </thead>
             <tbody>
-              {list.map((i) => {
+              {cs.sorted.map((i) => {
                 const aktuale = stock[i.id] ?? 0
                 const v = counts[i.id] ?? ''
                 const d = v !== '' && Number.isInteger(Number(v)) ? Number(v) - aktuale : null
@@ -371,21 +382,29 @@ function MovementsTab() {
 }
 
 export function MovementTable({ rows, itemsById, hideItem }) {
+  const s = useSort(rows, {
+    koha: (m) => m.krijuar,
+    artikulli: (m) => itemsById?.[m.itemId]?.emri,
+    lloji: (m) => MOVEMENT_TYPES[m.tipi] ?? m.tipi,
+    sasia: (m) => m.sasia,
+    dokumenti: (m) => m.numri,
+    perdoruesi: (m) => m.emri,
+  })
   return (
     <div className="table-wrap">
       <table className="table">
         <thead>
           <tr>
-            <th>Koha</th>
-            {!hideItem && <th>Artikulli</th>}
-            <th>Lloji</th>
-            <th className="num">Sasia</th>
-            <th>Dokumenti</th>
-            <th>Përdoruesi</th>
+            <SortTh s={s} k="koha">Koha</SortTh>
+            {!hideItem && <SortTh s={s} k="artikulli">Artikulli</SortTh>}
+            <SortTh s={s} k="lloji">Lloji</SortTh>
+            <SortTh s={s} k="sasia" className="num">Sasia</SortTh>
+            <SortTh s={s} k="dokumenti">Dokumenti</SortTh>
+            <SortTh s={s} k="perdoruesi">Përdoruesi</SortTh>
           </tr>
         </thead>
         <tbody>
-          {rows.map((m) => {
+          {s.sorted.map((m) => {
             const it = itemsById?.[m.itemId]
             return (
               <tr key={m.id}>

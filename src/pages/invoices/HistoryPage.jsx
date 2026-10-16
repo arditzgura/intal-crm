@@ -19,6 +19,7 @@ import { formatDate, formatDateTime, fromInputDate, periodLabel, periodRange, to
 import { StatusBadge, ACTION_LABELS, CancelModal } from './InvoiceViewPage'
 import Modal from '../../components/Modal'
 import InvoicePreview from '../../components/invoice/InvoicePreview'
+import { useSort, SortTh } from '../../hooks/useSort'
 import PeriodFilter, { defaultPeriod } from '../../components/PeriodFilter'
 
 
@@ -117,6 +118,15 @@ export function InvoiceList({ fixedClientId, period: extPeriod, setPeriod: extSe
     }
   }
 
+  const s = useSort(rows, {
+    nr: (r) => r.numri,
+    data: (r) => r.data,
+    klienti: (r) => r.klient?.emri,
+    vlera: (r) => r.totali,
+    arketuar: (r) => (r.statusi === 'draft' ? null : r.paguar),
+    detyrimi: (r) => (r.statusi === 'pa_paguar' ? r.mbetur : r.statusi === 'pasuar' ? r.gjendjaRe : r.statusi === 'e_paguar' ? 0 : null),
+    statusi: (r) => STATUS_LABELS[r.statusi],
+  })
   const totals = {}
   for (const r of rows.filter((x) => x.statusi !== 'anuluar' && x.statusi !== 'draft')) totals[r.monedha] = (totals[r.monedha] ?? 0) + r.totali
 
@@ -148,25 +158,26 @@ export function InvoiceList({ fixedClientId, period: extPeriod, setPeriod: extSe
       {report && <ReportModal target={target} filters={baseFilters} label={label} onClose={() => setReport(false)} />}
 
       <div className="card no-pad">
+        {s.sort && more && <div className="sort-hint">Renditja vlen për faturat e kësaj faqeje. Përdorni filtrat për të ngushtuar listën.</div>}
         <div className="table-wrap">
           <table className="table clickable-rows history-table">
             <thead>
               <tr>
-                <th>Nr.</th>
-                <th>Data</th>
-                {!fixedClientId && <th>Klienti &amp; qyteti</th>}
-                <th className="num">Vlera e faturës</th>
-                <th className="num">Arkëtuar</th>
-                <th className="num">Detyrimi</th>
+                <SortTh s={s} k="nr">Nr.</SortTh>
+                <SortTh s={s} k="data">Data</SortTh>
+                {!fixedClientId && <SortTh s={s} k="klienti">Klienti &amp; qyteti</SortTh>}
+                <SortTh s={s} k="vlera" className="num">Vlera e faturës</SortTh>
+                <SortTh s={s} k="arketuar" className="num">Arkëtuar</SortTh>
+                <SortTh s={s} k="detyrimi" className="num">Detyrimi</SortTh>
                 <th className="check-col" title="E paguar" />
-                <th>Statusi</th>
+                <SortTh s={s} k="statusi">Statusi</SortTh>
                 <th className="num">Veprime</th>
               </tr>
             </thead>
             <tbody>
               {loading && <tr><td colSpan={9} className="muted">Duke u ngarkuar…</td></tr>}
               {!loading && !rows.length && <tr><td colSpan={9} className="muted">Asnjë faturë.</td></tr>}
-              {!loading && rows.map((r) => {
+              {!loading && s.sorted.map((r) => {
                 const isDraft = r.statusi === 'draft'
                 const open = () => (isDraft ? navigate(`/fature-e-re?draft=${r.id}`) : setPreview(r))
                 return (

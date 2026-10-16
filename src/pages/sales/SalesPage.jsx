@@ -11,6 +11,7 @@ import { CURRENCIES, formatMoney, toLek } from '../../utils/money'
 import { endOfDay, formatDate, startOfDay, toInputDate } from '../../utils/date'
 import { downloadCsv } from '../../utils/csv'
 import SearchPicker from '../../components/SearchPicker'
+import { useSort, SortTh } from '../../hooks/useSort'
 
 const GROUPS = {
   artikulli: 'Sipas artikullit',
@@ -86,6 +87,18 @@ export default function SalesPage() {
   const labelText = (r) =>
     group === 'artikulli' ? `${iById[r.id]?.kodi ?? ''} ${iById[r.id]?.emri ?? r.id}` : group === 'klienti' ? `${cById[r.id]?.kodi ?? ''} ${cById[r.id]?.emri ?? r.id}` : formatDate(new Date(r.id))
 
+  const s = useSort(rows, {
+    grupi: (r) => (group === 'rreshtat' ? null : labelText(r)),
+    data: (r) => r.l?.data,
+    fatura: (r) => r.l?.numri,
+    klienti: (r) => cById[r.l?.clientId]?.emri,
+    artikulli: (r) => iById[r.l?.itemId]?.emri,
+    cmimi: (r) => r.l?.cmimi,
+    sasia: (r) => r.sasia,
+    totali: (r) => r.totali,
+    lek: (r) => r.lek,
+    nrFatura: (r) => r.fatura,
+  })
   function exportCsv() {
     if (group === 'rreshtat') {
       downloadCsv(`shitjet_${period.from}_${period.to}.csv`, ['Data', 'Fatura', 'Klienti', 'Artikulli', 'Sasia', 'Çmimi', 'Totali', 'Monedha', 'Totali LEK'],
@@ -129,15 +142,15 @@ export default function SalesPage() {
           <table className="table">
             <thead>
               {group === 'rreshtat' ? (
-                <tr><th>Data</th><th>Fatura</th><th>Klienti</th><th>Artikulli</th><th className="num">Sasia</th><th className="num">Çmimi</th><th className="num">Totali</th></tr>
+                <tr><SortTh s={s} k="data">Data</SortTh><SortTh s={s} k="fatura">Fatura</SortTh><SortTh s={s} k="klienti">Klienti</SortTh><SortTh s={s} k="artikulli">Artikulli</SortTh><SortTh s={s} k="sasia" className="num">Sasia</SortTh><SortTh s={s} k="cmimi" className="num">Çmimi</SortTh><SortTh s={s} k="totali" className="num">Totali</SortTh></tr>
               ) : (
-                <tr><th>{GROUPS[group].replace('Sipas ', '')}</th><th className="num">Sasia</th><th className="num">Totali</th><th className="num">Në LEK</th><th className="num">Fatura</th></tr>
+                <tr><SortTh s={s} k="grupi">{GROUPS[group].replace('Sipas ', '')}</SortTh><SortTh s={s} k="sasia" className="num">Sasia</SortTh><SortTh s={s} k="totali" className="num">Totali</SortTh><SortTh s={s} k="lek" className="num">Në LEK</SortTh><SortTh s={s} k="nrFatura" className="num">Fatura</SortTh></tr>
               )}
             </thead>
             <tbody>
               {loading && <tr><td colSpan={7} className="muted">Duke u ngarkuar…</td></tr>}
               {!loading && !rows.length && <tr><td colSpan={7} className="muted">Asnjë shitje në këtë periudhë.</td></tr>}
-              {!loading && group === 'rreshtat' && rows.map(({ l }) => (
+              {!loading && group === 'rreshtat' && s.sorted.map(({ l }) => (
                 <tr key={l.id}>
                   <td>{formatDate(l.data)}</td>
                   <td><Link to={`/fatura/${l.invoiceId}`}>#{l.numri}</Link></td>
@@ -148,7 +161,7 @@ export default function SalesPage() {
                   <td className="num">{formatMoney(l.totali, l.monedha)}</td>
                 </tr>
               ))}
-              {!loading && group !== 'rreshtat' && rows.map((r) => (
+              {!loading && group !== 'rreshtat' && s.sorted.map((r) => (
                 <tr key={r.key}>
                   <td>{label(r)}</td>
                   <td className="num">{r.sasia}</td>

@@ -676,3 +676,14 @@ body.preview-open { overflow: hidden; }
 .kpi-dark { background: #0f172a; color: #fff; }
 .kpi-dark > span { color: #818cf8; }
 .kpi-dark.credit > span { color: #6ee7b7; }
+
+/* Kolonat që renditen me klik */
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--text); }
+th.sortable .th-inner { display: inline-flex; align-items: center; gap: 4px; }
+th.num.sortable .th-inner { flex-direction: row; }
+th.sortable .sort-icon { opacity: 0.35; flex-shrink: 0; }
+th.sortable.sorted { color: var(--primary); }
+th.sortable.sorted .sort-icon { opacity: 1; }
+.ni-lines-head .sortable { cursor: default; }
+.sort-hint { font-size: 0.75rem; color: var(--muted); padding: 8px 14px 0; }
