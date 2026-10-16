@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { DollarSign, TrendingUp, Wallet, Receipt, FileText, AlertCircle, Landmark, Truck, Warehouse } from 'lucide-react'
+import { DollarSign, TrendingUp, Wallet, Receipt, AlertCircle, Landmark, Truck, Warehouse, History, ArrowRight } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
 import { watchClients } from '../../services/clientService'
@@ -21,7 +21,7 @@ export default function DashboardPage() {
   const { perms } = useAuth()
   const showProfit = canSeeCost(perms)
   const canCash = perms.has('mod_financa') || perms.has('mod_raporte') || perms.has('mod_paneli')
-  const [period, setPeriod] = useState(defaultPeriod)
+  const [period, setPeriod] = useState(() => ({ ...defaultPeriod(), kind: 'month' }))
   const range = useMemo(() => periodRange(period), [period])
   const label = periodLabel(period)
 
@@ -33,6 +33,8 @@ export default function DashboardPage() {
 
   const [sum, setSum] = useState(null)
   const [profit, setProfit] = useState(null)
+  const [allSum, setAllSum] = useState(null)
+  const [allProfit, setAllProfit] = useState(null)
   const [itemSales, setItemSales] = useState(null)
   const [months, setMonths] = useState(null)
   const [error, setError] = useState('')
@@ -67,7 +69,17 @@ export default function DashboardPage() {
 
   useEffect(() => {
     monthlySales(12).then(setMonths).catch(() => setMonths([]))
+    invoiceSummary({}).then(setAllSum).catch((err) => setError(errorMessage(err)))
   }, [])
+
+  // Fitimi akumuluar (gjithë kohës)
+  useEffect(() => {
+    if (!showProfit || !items.length || !costKey) return undefined
+    let cancelled = false
+    invoiceProfit({}, items.map((i) => i.id), costs).then((p) => !cancelled && setAllProfit(p)).catch(() => !cancelled && setAllProfit(undefined))
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showProfit, itemKey, costKey])
 
   // Detyrimet aktuale
   const debt = {}
@@ -102,41 +114,82 @@ export default function DashboardPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">Paneli</h1>
-          <div className="muted small">Pasqyra përmbledhëse e biznesit · {label}</div>
+          <div className="muted small">Sistemi i Menaxhimit për INTAL ALBANIA</div>
+        </div>
+      </div>
+      {error && <div className="alert error">{error}</div>}
+
+      {/* Pasqyra e akumuluar: gjithmonë gjithë kohës */}
+      <div className="acc-hero">
+        <History className="acc-hero-bg" size={150} />
+        <div className="acc-title">
+          <div className="acc-title-icon"><Landmark size={24} /></div>
+          <div>
+            <b>Pasqyra e akumuluar</b>
+            <span>Që nga fillimi i përdorimit të aplikacionit</span>
+          </div>
+        </div>
+        <div className="acc-tiles">
+          <div className="acc-tile">
+            <span>Xhiro totale (LEK)</span>
+            <b>{allSum ? formatMoney(lek(allSum.sales)) : '…'}</b>
+            <small className="acc-green"><TrendingUp size={12} /> {allSum ? `${allSum.count.toLocaleString('sq')} fatura totale` : ''}{allSum && extra(allSum.sales) ? ` · + ${extra(allSum.sales)}` : ''}</small>
+          </div>
+          {showProfit && (
+            <div className="acc-tile" title="Shitjet në LEK − sasia × kosto aktuale e artikujve">
+              <span className="acc-green">Fitimi akumuluar (LEK)</span>
+              <b className="acc-green">{allProfit == null ? '…' : allProfit === undefined ? '—' : formatMoney(allProfit)}</b>
+              <small>Pas zbritjes së kostos së blerjes</small>
+            </div>
+          )}
+          <div className="acc-tile">
+            <span className="acc-yellow">Arkëtuar gjithsej (LEK)</span>
+            <b className="acc-yellow">{allSum ? (allSum.receiptsError ? '—' : formatMoney(lek(allSum.receipts))) : '…'}</b>
+            <small>Vlera monetare e futur në arkë</small>
+          </div>
+          <div className="acc-tile acc-debt">
+            <span>Detyrime të mbetura</span>
+            <b>{formatMoney(lek(debt))}</b>
+            <small>Borxhi aktual jashtë · <Link to="/raporte?raporti=borxhet">Shiko listën <ArrowRight size={11} /></Link></small>
+          </div>
         </div>
       </div>
 
+      {/* Sipas periudhës (parazgjedhje: muaji) */}
       <div className="card period-card"><PeriodFilter period={period} setPeriod={setPeriod} /></div>
-      {error && <div className="alert error">{error}</div>}
 
       <div className="kpi-row dash-main">
         <div className="kpi kpi-white">
           <DollarSign className="kpi-icon" size={50} />
-          <span>Shitjet totale</span>
+          <span>Shitjet · {label}</span>
           <div className="kpi-value">{sum ? formatMoney(lek(sum.sales)) : '…'} <small>L</small></div>
-          <div className="kpi-sub">{sum ? `${sum.count.toLocaleString('sq')} fatura · ${label}` : label}{sum && extra(sum.sales) ? ` · + ${extra(sum.sales)}` : ''}</div>
+          <div className="kpi-sub">{sum ? `${sum.count.toLocaleString('sq')} fatura` : ''}{sum && extra(sum.sales) ? ` · + ${extra(sum.sales)}` : ''}</div>
         </div>
         {showProfit && (
           <div className="kpi kpi-green" title="Shitjet në LEK − sasia × kosto aktuale e artikujve">
             <TrendingUp className="kpi-icon" size={50} />
-            <span>Fitimi total</span>
+            <span>Fitimi · {label}</span>
             <div className="kpi-value">{profit == null ? '…' : profit === undefined ? '—' : `${profit >= 0 ? '+' : ''}${formatMoney(profit)}`} <small>L</small></div>
-            <div className="kpi-sub">{sum && profit != null && lek(sum.sales) ? `Marzhi ${Math.round((profit * 1000) / lek(sum.sales)) / 10}% · ${label}` : label}</div>
+            <div className="kpi-sub">{sum && profit != null && lek(sum.sales) ? `Marzhi ${Math.round((profit * 1000) / lek(sum.sales)) / 10}%` : ''}</div>
           </div>
         )}
-        <div className="kpi kpi-dark kpi-pink">
-          <Wallet className="kpi-icon" size={50} />
-          <span>Detyrimi total</span>
-          <div className="kpi-value">{formatMoney(lek(debt))} <small>L</small></div>
-          <div className="kpi-sub">{debtors} klientë me borxh{extra(debt) ? ` · + ${extra(debt)}` : ''} · gjendja aktuale</div>
+        <div className="kpi kpi-white">
+          <Receipt className="kpi-icon" size={50} />
+          <span>Arkëtimet · {label}</span>
+          <div className="kpi-value pos">{sum ? (sum.receiptsError ? '—' : formatMoney(lek(sum.receipts))) : '…'} <small>L</small></div>
+          <div className="kpi-sub">Pagesat e klientëve në periudhë</div>
+        </div>
+        <div className="kpi kpi-white">
+          <AlertCircle className="kpi-icon" size={50} />
+          <span>Pa paguar · {label}</span>
+          <div className="kpi-value neg">{sum ? formatMoney(lek(sum.unpaid)) : '…'} <small>L</small></div>
+          <div className="kpi-sub">Borxhi i faturave të periudhës</div>
         </div>
       </div>
 
       <div className="dash-stats">
-        <Stat icon={Receipt} label="Arkëtimet e periudhës" value={sum ? (sum.receiptsError ? '—' : formatMoney(lek(sum.receipts), 'LEK')) : '…'} cls="pos" />
-        <Stat icon={FileText} label="Fatura të lëshuara" value={sum ? sum.count.toLocaleString('sq') : '…'} />
-        <Stat icon={AlertCircle} label="Pa paguar (faturat e periudhës)" value={sum ? formatMoney(lek(sum.unpaid), 'LEK') : '…'} cls="neg" />
-        {canCash && <Stat icon={Landmark} label="Arka + Banka" value={formatMoney(lek(cash.arke) + lek(cash.banke), 'LEK')} sub={`Arkë ${formatMoney(lek(cash.arke))} · Bankë ${formatMoney(lek(cash.banke))}`} />}
+        {canCash && <Stat icon={Landmark} label="Arka + Banka (sot)" value={formatMoney(lek(cash.arke) + lek(cash.banke), 'LEK')} sub={`Arkë ${formatMoney(lek(cash.arke))} · Bankë ${formatMoney(lek(cash.banke))}`} />}
+        <Stat icon={Wallet} label="Klientë me borxh" value={String(debtors)} cls="neg" />
         <Stat icon={Truck} label="Detyrime ndaj furnitorëve" value={formatMoney(lek(payables), 'LEK')} />
         <Stat icon={Warehouse} label="Vlera e stokut (çmim shitje)" value={formatMoney(stockSale, 'LEK')} sub={showProfit ? `Me kosto: ${formatMoney(stockCost, 'LEK')}` : ''} />
       </div>

@@ -719,3 +719,24 @@ th.sortable.sorted .sort-icon { opacity: 1; }
 .bar-value { font-size: 0.68rem; font-weight: 700; color: #475569; margin-bottom: 4px; white-space: nowrap; }
 .bar-label { font-size: 0.72rem; font-weight: 700; color: #64748b; margin-top: 6px; text-align: center; line-height: 1.1; }
 .dash-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+
+/* Paneli: Pasqyra e akumuluar */
+.acc-hero { position: relative; overflow: hidden; background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #1e1b4b 100%); color: #fff; border-radius: 28px; padding: 30px 32px 34px; margin-bottom: 18px; border-bottom: 8px solid #e11d48; box-shadow: 0 14px 34px rgba(15, 23, 42, 0.25); }
+.acc-hero-bg { position: absolute; right: 30px; top: 30px; opacity: 0.06; }
+.acc-title { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; position: relative; }
+.acc-title-icon { width: 52px; height: 52px; border-radius: 14px; background: #e11d48; display: grid; place-items: center; box-shadow: 0 6px 16px rgba(225, 29, 72, 0.4); }
+.acc-title b { display: block; font-size: 1.2rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.3px; }
+.acc-title span { font-size: 0.72rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #a5b4fc; }
+.acc-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; position: relative; }
+.acc-tile { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 18px; padding: 22px 24px; display: flex; flex-direction: column; gap: 8px; }
+.acc-tile span { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: #cbd5e1; }
+.acc-tile b { font-size: 2.1rem; font-weight: 900; letter-spacing: -1px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.acc-tile small { font-size: 0.68rem; font-weight: 700; font-style: italic; color: #94a3b8; text-transform: uppercase; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.acc-green { color: #34d399 !important; }
+.acc-yellow { color: #fbbf24 !important; }
+.acc-debt { background: rgba(225, 29, 72, 0.14); border-color: rgba(244, 63, 94, 0.45); }
+.acc-debt span, .acc-debt b { color: #fb7185; }
+.acc-debt small { color: #fda4af; font-style: normal; }
+.acc-debt a { color: #fda4af; display: inline-flex; align-items: center; gap: 2px; }
+.kpi-value.pos { color: var(--success); }
+.kpi-value.neg { color: var(--danger); }
