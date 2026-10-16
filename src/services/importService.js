@@ -1,4 +1,4 @@
-import { Timestamp, onSnapshot, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore'
+import { Timestamp, getDocFromServer, onSnapshot, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore'
 import { db, firebaseConfig } from '../firebase'
 import { companyDoc } from './paths'
 import { RATE_SCALE } from '../utils/money'
@@ -502,8 +502,15 @@ export function buildImportPlan(backup, choices, actor) {
 
 // ---------- Ekzekutimi ----------
 
+/** Gjendja e importit; `pending` = ka shkrime që serveri s'i ka pranuar ende (p.sh. kuota). */
 export function watchImportMeta(onData, onError) {
-  return onSnapshot(metaRef(), (s) => onData(s.exists() ? s.data() : null), onError)
+  return onSnapshot(metaRef(), { includeMetadataChanges: true }, (s) => onData(s.exists() ? { ...s.data(), pending: s.metadata.hasPendingWrites } : null), onError)
+}
+
+/** Progresi i konfirmuar nga serveri (jo kopja lokale). */
+export async function readImportProgress() {
+  const s = await getDocFromServer(metaRef())
+  return s.exists() ? s.data() : null
 }
 
 export async function setImportMode(aktiv, extra = {}) {

@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
 import { useSettings } from '../../hooks/useSettings'
 import {
-  readBackupFile, buildImportPlan, planHash, runImport, watchImportMeta, setImportMode, QuotaError, projectId,
+  readBackupFile, buildImportPlan, planHash, runImport, watchImportMeta, readImportProgress, setImportMode, QuotaError, projectId,
 } from '../../services/importService'
 import { STATUS_LABELS } from '../../services/invoiceChain'
 import { errorMessage } from '../../services/authService'
@@ -41,7 +41,8 @@ export default function ImportTab() {
     }
   }, [backup, choices, user.uid, profile?.emri, eurRate])
   const hash = backup && eurRate ? planHash(backup, choices) : null
-  const canResume = meta && meta.done > 0 && !meta.perfunduar && meta.planHash === hash
+  // Kur serveri s'ka pranuar ende paketën e fundit (pending), importi s'ka mbaruar realisht.
+  const canResume = meta && meta.done > 0 && (!meta.perfunduar || meta.pending) && meta.planHash === hash
   const otherInProgress = meta && meta.done > 0 && !meta.perfunduar && hash && meta.planHash !== hash
 
   async function onFile(e) {
@@ -68,7 +69,16 @@ export default function ImportTab() {
 
   async function start(resume) {
     if (!plan || plan.error) return
-    const startAt = resume ? meta.done : 0
+    let startAt = 0
+    if (resume) {
+      // Vazhdo nga progresi i konfirmuar nga serveri.
+      const server = await readImportProgress().catch(() => null)
+      if (server?.perfunduar) {
+        setMsg({ type: 'success', text: 'Importi është përfunduar tashmë sipas serverit.' })
+        return
+      }
+      startAt = server?.done ?? meta.done
+    }
     const text = resume
       ? `Të vazhdojë importi nga shkrimi ${startAt} nga ${plan.ops.length}?`
       : `Të fillojë importi në projektin "${projectId}"?\n\n${plan.summary.faturat} fatura, ${plan.summary.klientet} klientë, ${plan.summary.artikujt} artikuj, ${plan.summary.hyrjet} hyrje.\n${plan.ops.length} shkrime gjithsej (kuota falas: 20 000 në ditë; importi vazhdon nesër nëse ndalon).\n\nDokumentet ekzistuese me të njëjtat ID mbishkruhen.`
