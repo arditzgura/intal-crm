@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { DollarSign, TrendingUp, Wallet, Receipt, AlertCircle, Landmark, Truck, Warehouse, History, ArrowRight } from 'lucide-react'
+import { Wallet, Landmark, Truck, Warehouse, ArrowRight } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
 import { watchClients } from '../../services/clientService'
@@ -109,81 +109,91 @@ export default function DashboardPage() {
   const extra = (m) => Object.entries(m ?? {}).filter(([c, v]) => c !== 'LEK' && v).map(([c, v]) => formatMoney(v, c)).join(' · ')
   const maxMonth = months ? Math.max(1, ...months.map((m) => m.totali)) : 1
 
+  const pct = (a, b) => (b ? `${Math.round((a * 1000) / b) / 10}%` : '—')
+  const maxDebt = topDebtors[0]?.gjendje.LEK ?? 1
+  const itemsTotal = topItems ? topItems.reduce((a, x) => a + x.totali, 0) : 0
+
   return (
-    <div className="dashboard">
+    <div className="dashboard dash2">
       <div className="page-head">
         <div>
           <h1 className="page-title">Paneli</h1>
-          <div className="muted small">Sistemi i Menaxhimit për INTAL ALBANIA</div>
+          <div className="muted small">Pasqyra e biznesit për INTAL ALBANIA · {new Date().toLocaleDateString('sq-AL', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
         </div>
       </div>
       {error && <div className="alert error">{error}</div>}
 
       {/* Pasqyra e akumuluar: gjithmonë gjithë kohës */}
-      <div className="acc-hero">
-        <History className="acc-hero-bg" size={150} />
-        <div className="acc-title">
-          <div className="acc-title-icon"><Landmark size={24} /></div>
-          <div>
-            <b>Pasqyra e akumuluar</b>
-            <span>Që nga fillimi i përdorimit të aplikacionit</span>
+      <div className="d2-section-label">Pasqyra e akumuluar · që nga fillimi i përdorimit</div>
+      <div className="d2-kpis">
+        <div className="d2-kpi top-indigo">
+          <span className="d2-kpi-label">Xhiro totale (LEK)</span>
+          <b className="d2-kpi-value">{allSum ? formatMoney(lek(allSum.sales)) : '…'}</b>
+          <div className="d2-kpi-foot">
+            <span className="pill pill-indigo">{allSum ? `${allSum.count.toLocaleString('sq')} fatura` : '…'}</span>
+            {allSum && extra(allSum.sales) && <span className="muted">+ {extra(allSum.sales)}</span>}
           </div>
         </div>
-        <div className="acc-tiles">
-          <div className="acc-tile acc-white">
-            <span>Xhiro totale (LEK)</span>
-            <b>{allSum ? formatMoney(lek(allSum.sales)) : '…'}</b>
-            <small className="acc-green"><TrendingUp size={12} /> {allSum ? `${allSum.count.toLocaleString('sq')} fatura totale` : ''}{allSum && extra(allSum.sales) ? ` · + ${extra(allSum.sales)}` : ''}</small>
-          </div>
-          {showProfit && (
-            <div className="acc-tile acc-profit" title="Shitjet në LEK − sasia × kosto aktuale e artikujve">
-              <span>Fitimi akumuluar (LEK)</span>
-              <b>{allProfit == null ? '…' : allProfit === undefined ? '—' : formatMoney(allProfit)}</b>
-              <small>Pas zbritjes së kostos së blerjes</small>
+        {showProfit && (
+          <div className="d2-kpi top-green" title="Shitjet në LEK − sasia × kosto aktuale e artikujve">
+            <span className="d2-kpi-label">Fitimi akumuluar (LEK)</span>
+            <b className="d2-kpi-value c-green">{allProfit == null ? '…' : allProfit === undefined ? '—' : formatMoney(allProfit)}</b>
+            <div className="d2-kpi-foot">
+              <span className="pill pill-green">Marzhi {allSum && allProfit != null ? pct(allProfit, lek(allSum.sales)) : '…'}</span>
+              <span className="muted">pas kostos së blerjes</span>
             </div>
-          )}
-          <div className="acc-tile acc-receipts">
-            <span>Arkëtuar gjithsej (LEK)</span>
-            <b>{allSum ? (allSum.receiptsError ? '—' : formatMoney(lek(allSum.receipts))) : '…'}</b>
-            <small>Vlera monetare e futur në arkë</small>
           </div>
-          <div className="acc-tile acc-debt">
-            <span>Detyrime të mbetura</span>
-            <b>{formatMoney(lek(debt))}</b>
-            <small>Borxhi aktual jashtë · <Link to="/raporte?raporti=borxhet">Shiko listën <ArrowRight size={11} /></Link></small>
+        )}
+        <div className="d2-kpi top-teal">
+          <span className="d2-kpi-label">Arkëtuar gjithsej (LEK)</span>
+          <b className="d2-kpi-value c-teal">{allSum ? (allSum.receiptsError ? '—' : formatMoney(lek(allSum.receipts))) : '…'}</b>
+          <div className="d2-kpi-foot">
+            <span className="pill pill-teal">{allSum && !allSum.receiptsError ? `${pct(lek(allSum.receipts), lek(allSum.sales))} e xhiros` : '…'}</span>
+            <span className="muted">futur në arkë</span>
+          </div>
+        </div>
+        <div className="d2-kpi top-red">
+          <span className="d2-kpi-label">Detyrime të mbetura (LEK)</span>
+          <b className="d2-kpi-value c-red">{formatMoney(lek(debt))}</b>
+          <div className="d2-kpi-foot">
+            <span className="pill pill-red">{debtors} klientë</span>
+            <Link to="/raporte?raporti=borxhet" className="d2-link">Shiko listën <ArrowRight size={11} /></Link>
           </div>
         </div>
       </div>
 
       {/* Sipas periudhës (parazgjedhje: muaji) */}
-      <div className="card period-card"><PeriodFilter period={period} setPeriod={setPeriod} /></div>
-
-      <div className="kpi-row dash-main">
-        <div className="kpi kpi-white">
-          <DollarSign className="kpi-icon" size={50} />
-          <span>Shitjet · {label}</span>
-          <div className="kpi-value">{sum ? formatMoney(lek(sum.sales)) : '…'} <small>L</small></div>
-          <div className="kpi-sub">{sum ? `${sum.count.toLocaleString('sq')} fatura` : ''}{sum && extra(sum.sales) ? ` · + ${extra(sum.sales)}` : ''}</div>
-        </div>
-        {showProfit && (
-          <div className="kpi kpi-green" title="Shitjet në LEK − sasia × kosto aktuale e artikujve">
-            <TrendingUp className="kpi-icon" size={50} />
-            <span>Fitimi · {label}</span>
-            <div className="kpi-value">{profit == null ? '…' : profit === undefined ? '—' : `${profit >= 0 ? '+' : ''}${formatMoney(profit)}`} <small>L</small></div>
-            <div className="kpi-sub">{sum && profit != null && lek(sum.sales) ? `Marzhi ${Math.round((profit * 1000) / lek(sum.sales)) / 10}%` : ''}</div>
+      <div className="d2-panel">
+        <div className="d2-panel-head">
+          <div>
+            <h3>Pasqyra e periudhës · {label}</h3>
+            <p>Faturat e lëshuara dhe pagesat e klientëve në periudhën e zgjedhur</p>
           </div>
-        )}
-        <div className="kpi kpi-white">
-          <Receipt className="kpi-icon" size={50} />
-          <span>Arkëtimet · {label}</span>
-          <div className="kpi-value pos">{sum ? (sum.receiptsError ? '—' : formatMoney(lek(sum.receipts))) : '…'} <small>L</small></div>
-          <div className="kpi-sub">Pagesat e klientëve në periudhë</div>
         </div>
-        <div className="kpi kpi-white">
-          <AlertCircle className="kpi-icon" size={50} />
-          <span>Pa paguar · {label}</span>
-          <div className="kpi-value neg">{sum ? formatMoney(lek(sum.unpaid)) : '…'} <small>L</small></div>
-          <div className="kpi-sub">Borxhi i faturave të periudhës</div>
+        <PeriodFilter period={period} setPeriod={setPeriod} />
+        <div className="d2-strip">
+          <div>
+            <span>Shitjet</span>
+            <b>{sum ? formatMoney(lek(sum.sales)) : '…'} <small>L</small></b>
+            <em>{sum ? `${sum.count.toLocaleString('sq')} fatura` : ''}{sum && extra(sum.sales) ? ` · + ${extra(sum.sales)}` : ''}</em>
+          </div>
+          {showProfit && (
+            <div title="Shitjet në LEK − sasia × kosto aktuale e artikujve">
+              <span>Fitimi</span>
+              <b className="c-green">{profit == null ? '…' : profit === undefined ? '—' : `${profit >= 0 ? '+' : ''}${formatMoney(profit)}`} <small>L</small></b>
+              <em>{sum && profit != null && lek(sum.sales) ? `Marzhi ${pct(profit, lek(sum.sales))}` : ''}</em>
+            </div>
+          )}
+          <div>
+            <span>Arkëtimet</span>
+            <b className="c-green">{sum ? (sum.receiptsError ? '—' : formatMoney(lek(sum.receipts))) : '…'} <small>L</small></b>
+            <em>Pagesat e klientëve</em>
+          </div>
+          <div>
+            <span>Pa paguar</span>
+            <b className="c-red">{sum ? formatMoney(lek(sum.unpaid)) : '…'} <small>L</small></b>
+            <em>Borxhi i faturave të periudhës</em>
+          </div>
         </div>
       </div>
 
@@ -194,55 +204,85 @@ export default function DashboardPage() {
         <Stat icon={Warehouse} label="Vlera e stokut (çmim shitje)" value={formatMoney(stockSale, 'LEK')} sub={showProfit ? `Me kosto: ${formatMoney(stockCost, 'LEK')}` : ''} />
       </div>
 
-      <div className="card">
-        <h3>Shitjet e 12 muajve të fundit (LEK)</h3>
-        {!months ? <p className="muted">Duke u ngarkuar…</p> : (
-          <div className="bar-chart">
-            {months.map((m) => {
-              const [y, mm] = m.key.split('-').map(Number)
-              return (
-                <div key={m.key} className="bar-col" title={`${MONTHS[mm - 1]} ${y}: ${formatMoney(m.totali, 'LEK')} · ${m.fatura} fatura`}>
-                  <div className="bar-value">{m.totali ? `${formatMoney(Math.round(m.totali / 100000) * 100)}k` : ''}</div>
-                  <div className="bar" style={{ height: `${Math.max(2, (m.totali / maxMonth) * 100)}%` }} />
-                  <div className="bar-label">{MONTHS[mm - 1]}<br /><small>{String(y).slice(2)}</small></div>
-                </div>
-              )
-            })}
+      <div className="d2-grid">
+        <div className="d2-panel">
+          <div className="d2-panel-head">
+            <div>
+              <h3>Shitjet e 12 muajve të fundit (LEK)</h3>
+              <p>Vlera e faturave të lëshuara për çdo muaj, pa të anuluarat</p>
+            </div>
+            <div className="d2-legend">
+              <span><i className="dot dot-indigo" /> Muajt e kaluar</span>
+              <span><i className="dot dot-red" /> Muaji aktual</span>
+            </div>
           </div>
-        )}
-        <p className="muted small">Vlerat mbi shtylla janë në mijë Lek (k). Kaloni miun mbi shtyllë për shumën e plotë.</p>
+          {!months ? <p className="muted">Duke u ngarkuar…</p> : (
+            <div className="bar-chart">
+              {months.map((m) => {
+                const [y, mm] = m.key.split('-').map(Number)
+                return (
+                  <div key={m.key} className="bar-col" title={`${MONTHS[mm - 1]} ${y}: ${formatMoney(m.totali, 'LEK')} · ${m.fatura} fatura`}>
+                    <div className="bar-value">{m.totali ? `${formatMoney(Math.round(m.totali / 100000) * 100)}k` : ''}</div>
+                    <div className="bar" style={{ height: `${Math.max(2, (m.totali / maxMonth) * 100)}%` }} />
+                    <div className="bar-label">{MONTHS[mm - 1]}<br /><small>{String(y).slice(2)}</small></div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          <p className="d2-note">Vlerat mbi shtylla janë në mijë Lek (k). Kaloni miun mbi shtyllë për shumën e plotë.</p>
+        </div>
+
+        <div className="d2-panel">
+          <div className="d2-panel-head">
+            <div>
+              <h3>Klientët me borxhin më të madh</h3>
+              <p>Detyrimi aktual në LEK</p>
+            </div>
+          </div>
+          <div className="d2-meters">
+            {topDebtors.map((c) => (
+              <div key={c.id} className="d2-meter">
+                <div className="d2-meter-top">
+                  <Link to={`/kliente/${c.id}`} className="client-link">{c.emri}</Link>
+                  <b className="c-red">{formatMoney(c.gjendje.LEK)}</b>
+                </div>
+                <div className="d2-meter-track"><div style={{ width: `${Math.max(3, (c.gjendje.LEK / maxDebt) * 100)}%` }} /></div>
+                <small className="muted">{c.qyteti || '—'} · {pct(c.gjendje.LEK, lek(debt))} e borxhit total</small>
+              </div>
+            ))}
+            {!topDebtors.length && <p className="muted">Asnjë klient me borxh.</p>}
+          </div>
+          <Link to="/raporte?raporti=borxhet" className="d2-link d2-foot-link">Shiko të gjitha borxhet <ArrowRight size={12} /></Link>
+        </div>
       </div>
 
-      <div className="dash-lists">
-        <div className="card no-pad">
-          <h3 className="pad">Klientët me borxhin më të madh</h3>
-          <table className="table">
-            <tbody>
-              {topDebtors.map((c) => (
-                <tr key={c.id}>
-                  <td><Link to={`/kliente/${c.id}`} className="client-link">{c.emri}</Link><div className="small muted">{c.qyteti}</div></td>
-                  <td className="num neg"><b>{formatMoney(c.gjendje.LEK, 'LEK')}</b></td>
-                </tr>
-              ))}
-              {!topDebtors.length && <tr><td className="muted">Asnjë klient me borxh.</td></tr>}
-            </tbody>
-          </table>
+      <div className="d2-panel no-pad">
+        <div className="d2-panel-head pad">
+          <div>
+            <h3>Artikujt më të shitur · {label}</h3>
+            <p>Renditur sipas vlerës së shitjeve në LEK</p>
+          </div>
         </div>
-        <div className="card no-pad">
-          <h3 className="pad">Artikujt më të shitur · {label}</h3>
-          <table className="table">
-            <tbody>
-              {!topItems && <tr><td className="muted">Duke u ngarkuar…</td></tr>}
-              {topItems?.map(({ i, totali, sasia }) => (
-                <tr key={i.id}>
-                  <td><Link to={`/artikujt/${i.id}`}><b>{i.emri}</b></Link><div className="small muted">{sasia} {i.njesia}</div></td>
-                  <td className="num"><b>{formatMoney(totali, 'LEK')}</b></td>
-                </tr>
-              ))}
-              {topItems && !topItems.length && <tr><td className="muted">Asnjë shitje në këtë periudhë.</td></tr>}
-            </tbody>
-          </table>
-        </div>
+        <table className="table d2-table">
+          <thead>
+            <tr><th>Artikulli</th><th className="num">Sasia</th><th className="num">Shitjet (LEK)</th><th className="d2-share-col">Pjesa në top 5</th></tr>
+          </thead>
+          <tbody>
+            {!topItems && <tr><td colSpan={4} className="muted">Duke u ngarkuar…</td></tr>}
+            {topItems?.map(({ i, totali, sasia }) => (
+              <tr key={i.id}>
+                <td><Link to={`/artikujt/${i.id}`}><b>{i.emri}</b></Link></td>
+                <td className="num">{sasia} <span className="muted">{i.njesia}</span></td>
+                <td className="num"><b>{formatMoney(totali)}</b></td>
+                <td className="d2-share-col">
+                  <div className="d2-share"><div className="d2-meter-track indigo"><div style={{ width: `${(totali / (itemsTotal || 1)) * 100}%` }} /></div><span>{pct(totali, itemsTotal)}</span></div>
+                </td>
+              </tr>
+            ))}
+            {topItems && !topItems.length && <tr><td colSpan={4} className="muted">Asnjë shitje në këtë periudhë.</td></tr>}
+          </tbody>
+        </table>
       </div>
     </div>
   )
