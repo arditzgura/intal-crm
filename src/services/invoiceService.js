@@ -576,11 +576,16 @@ export async function monthlySales(months = 12) {
   return Promise.all(list.map(async (d) => {
     const from = new Date(d.getFullYear(), d.getMonth(), 1)
     const to = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
-    const r = await getAggregateFromServer(
-      query(companyCol('invoices'), where('monedha', '==', 'LEK'), where('statusi', 'in', ISSUED), ...rangeCons({ from, to })),
+    // Një kërkesë për çdo status (barazi), pa "in" – përdor indeksin (monedha, statusi, data).
+    const parts = await Promise.all(ISSUED.map((st) => getAggregateFromServer(
+      query(companyCol('invoices'), where('monedha', '==', 'LEK'), where('statusi', '==', st), ...rangeCons({ from, to })),
       { t: sum('totali'), n: count() },
-    )
-    return { key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, totali: r.data().t ?? 0, fatura: r.data().n }
+    )))
+    return {
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      totali: parts.reduce((a, r) => a + (r.data().t ?? 0), 0),
+      fatura: parts.reduce((a, r) => a + r.data().n, 0),
+    }
   }))
 }
 
