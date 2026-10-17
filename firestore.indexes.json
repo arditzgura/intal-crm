@@ -333,6 +333,222 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "monedha",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "statusi",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "totali",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "monedha",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "statusi",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "data",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "totali",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "monedha",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "statusi",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "mbetur",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "monedha",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "statusi",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "data",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "mbetur",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "ledger",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "monedha",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tipi",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "shuma",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "ledger",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "monedha",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tipi",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "data",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "shuma",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "invoiceLines",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "anuluar",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "itemId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "monedha",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "totali",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "invoiceLines",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "anuluar",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "itemId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "monedha",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "data",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "totali",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "invoiceLines",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "anuluar",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "itemId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "monedha",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "sasia",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "invoiceLines",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "anuluar",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "itemId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "monedha",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "data",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "sasia",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []
