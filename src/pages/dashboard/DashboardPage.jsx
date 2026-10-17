@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Wallet, Landmark, Truck, Warehouse, ArrowRight, RefreshCw } from 'lucide-react'
+import { ArrowRight, RefreshCw } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
 import { watchCashBalances } from '../../services/cashService'
 import { invoiceSummary, itemSalesTotals } from '../../services/invoiceService'
 import {
-  liveTotals, monthKey, profitFrom, readCosts, readItems, readStats, refreshStats, statsStale, topItemsFrom,
+  cashTotals, liveTotals, monthKey, profitFrom, readCosts, readItems, readStats, refreshStats, statsStale, topItemsFrom,
 } from '../../services/dashboardService'
 import { errorMessage } from '../../services/authService'
 import { canSeeCost } from '../../config/roles'
@@ -37,6 +37,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
   const [custom, setCustom] = useState(null)
+  const [cashT, setCashT] = useState(null)
   const [error, setError] = useState('')
   const catalog = useRef(null)
 
@@ -58,13 +59,14 @@ export default function DashboardPage() {
   useEffect(() => {
     invoiceSummary({}).then(setAllSum).catch((err) => setError(errorMessage(err)))
     liveTotals().then(setTotals).catch((err) => setError(errorMessage(err)))
+    if (canCash) cashTotals().then(setCashT).catch((err) => setError(errorMessage(err)))
     readStats(showProfit)
       .then((s) => {
         if (s.base) setStats(s)
         if (statsStale(s, showProfit)) refresh()
       })
       .catch((err) => setError(errorMessage(err)))
-  }, [showProfit, refresh])
+  }, [showProfit, refresh, canCash])
 
   // Periudhë tjetër nga muaji aktual: shitjet për artikull llogariten vetëm kur zgjidhet.
   useEffect(() => {
@@ -202,11 +204,16 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="dash-stats">
-        {canCash && <Stat icon={Landmark} label="Arka + Banka (sot)" value={formatMoney(lek(cash.arke) + lek(cash.banke), 'LEK')} sub={`Arkë ${formatMoney(lek(cash.arke))} · Bankë ${formatMoney(lek(cash.banke))}`} />}
-        <Stat icon={Wallet} label="Klientë me borxh" value={totals ? String(debtors) : '…'} sub={extra(debt) ? `+ ${extra(debt)}` : ''} cls="neg" />
-        <Stat icon={Truck} label="Detyrime ndaj furnitorëve" value={totals ? formatMoney(lek(payables), 'LEK') : '…'} />
-        <Stat icon={Warehouse} label="Vlera e stokut (çmim shitje)" value={base ? formatMoney(stockSale, 'LEK') : '…'} sub={showProfit && cost ? `Me kosto: ${formatMoney(stockCost, 'LEK')}` : ''} />
+      <div className="d2-mini-row">
+        {canCash && (
+          <>
+            <Mini label="Arka · të gjitha hyrjet" value={cashT ? formatMoney(cashT.hyrje) : '…'} cls="c-green" />
+            <Mini label="Pagesat e kryera" value={cashT ? formatMoney(cashT.pagesa) : '…'} cls="c-red" />
+            <Mini label="Neto (hyrjet − pagesat)" value={cashT ? formatMoney(cashT.neto) : '…'} sub={`Arkë ${formatMoney(lek(cash.arke))} · Bankë ${formatMoney(lek(cash.banke))}`} />
+          </>
+        )}
+        <Mini label="Detyrime ndaj furnitorëve" value={totals ? formatMoney(lek(payables)) : '…'} />
+        <Mini label="Vlera e stokut (çmim shitje)" value={base ? formatMoney(stockSale) : '…'} sub={showProfit && cost ? `Me kosto ${formatMoney(stockCost)}` : ''} />
       </div>
 
       <div className="d2-grid">
@@ -311,15 +318,12 @@ export default function DashboardPage() {
   )
 }
 
-function Stat({ icon: Icon, label, value, sub, cls = '' }) {
+function Mini({ label, value, sub, cls = '' }) {
   return (
-    <div className="dash-stat">
-      <Icon size={20} className="dash-stat-icon" />
-      <div>
-        <div className="dash-stat-label">{label}</div>
-        <div className={`dash-stat-value ${cls}`}>{value}</div>
-        {sub && <div className="small muted">{sub}</div>}
-      </div>
+    <div className="d2-mini">
+      <span>{label}</span>
+      <b className={cls}>{value} <small>L</small></b>
+      {sub && <em>{sub}</em>}
     </div>
   )
 }

@@ -583,7 +583,7 @@ service cloud.firestore {
       // ---------- Financa ----------
       // Arka / banka: vetëm shtim; çdo lëvizje lidhet me burimin e saj.
       match /cashMovements/{movementId} {
-        allow read: if canAny(companyId, ['mod_financa', 'mod_raporte']);
+        allow read: if canAny(companyId, ['mod_financa', 'mod_raporte', 'mod_paneli']);
         allow create: if validCash(companyId);
         allow update, delete: if false;
       }

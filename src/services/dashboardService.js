@@ -37,6 +37,25 @@ export async function liveTotals() {
 }
 
 /**
+ * Paratë në LEK (gjithë kohës, arkë + bankë), nga serveri (3 lexime):
+ * hyrjet = Σ lëvizjet pozitive, pagesat = Σ lëvizjet negative (pa transfertat mes
+ * arkës dhe bankës, që anulojnë njëra-tjetrën), neto = hyrjet − pagesat.
+ */
+export async function cashTotals() {
+  const col = companyCol('cashMovements')
+  const lek = where('monedha', '==', 'LEK')
+  const [inn, out, tr] = await Promise.all([
+    getAggregateFromServer(query(col, lek, where('shuma', '>', 0)), { s: sum('shuma') }),
+    getAggregateFromServer(query(col, lek, where('shuma', '<', 0)), { s: sum('shuma') }),
+    getAggregateFromServer(query(col, lek, where('tipi', '==', 'transferte'), where('shuma', '>', 0)), { s: sum('shuma') }),
+  ])
+  const transfers = tr.data().s ?? 0
+  const hyrje = (inn.data().s ?? 0) - transfers
+  const pagesa = -(out.data().s ?? 0) - transfers
+  return { hyrje, pagesa, neto: hyrje - pagesa }
+}
+
+/**
  * Gjendja në fund të muajit para `now`: { key, stock: { itemId: sasia }, debtLEK }.
  * Nëse nuk ekziston, llogaritet nga gjendja aktuale − lëvizjet e këtij muaji dhe ruhet.
  */

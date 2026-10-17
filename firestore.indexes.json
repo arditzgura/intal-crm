@@ -549,6 +549,38 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "cashMovements",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "monedha",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "shuma",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cashMovements",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "monedha",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tipi",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "shuma",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []
