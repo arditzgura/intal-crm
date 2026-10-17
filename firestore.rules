@@ -488,7 +488,7 @@ service cloud.firestore {
 
       // Lëvizjet e stokut: vetëm shtim. Burimi i së vërtetës për stokun.
       match /stockMovements/{movementId} {
-        allow read: if canAny(companyId, ['mod_inventari', 'mod_artikujt', 'mod_blerje', 'mod_raporte']);
+        allow read: if canAny(companyId, ['mod_inventari', 'mod_artikujt', 'mod_blerje', 'mod_raporte', 'mod_paneli']);
         allow create: if request.resource.data.uid == request.auth.uid
           && request.resource.data.krijuar == request.time
           && request.resource.data.sasia is int && request.resource.data.sasia != 0 && (
@@ -609,6 +609,20 @@ service cloud.firestore {
           && request.resource.data.clientId is string;
         allow update: if can(companyId, 'financa_furnitore') && moneyDocCancel();
         allow delete: if false;
+      }
+
+      // ---------- Paneli ----------
+      // Statistikat e ruajtura (rillogariten nga Paneli). Kostoja/fitimi vetëm me sheh_koston.
+      match /stats/{docId} {
+        allow read, write: if can(companyId, 'mod_paneli')
+          && (docId == 'paneli' || (docId == 'paneliKosto' && can(companyId, 'sheh_koston')));
+      }
+      // Gjendja në fund të muajit (stoku + borxhi): krijohet një herë, nuk ndryshohet.
+      match /snapshots/{key} {
+        allow read: if can(companyId, 'mod_paneli');
+        allow create: if can(companyId, 'mod_paneli') && key.matches('^[0-9]{4}-[0-9]{2}$')
+          && request.resource.data.key == key && request.resource.data.debtLEK is int;
+        allow update, delete: if isAdmin(companyId);
       }
 
       // ---------- Importi (Faza 6) ----------

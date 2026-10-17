@@ -59,6 +59,11 @@ React + Vite, HashRouter, Firebase (vetëm Auth email/fjalëkalim + Firestore). 
 - Rules dhe indekset publikohen me `npx firebase-tools deploy --only firestore` (pyet para çdo deploy-i).
 - Repo në GitHub: `intal-crm` (`base: '/intal-crm/'`). Repo-ja `intal-pro` është sistemi i vjetër – mos e prek.
 
+## Paneli (lexime të pakta)
+- `services/dashboardService.js`: borxhi/detyrimet me sum/count nga serveri; statistikat e rënda (grafiku, top artikujt, vlera e stokut, fitimi) te `stats/paneli` + `stats/paneliKosto` (vetëm `sheh_koston`), rillogaritur pas 6 orësh ose me "Rifresko".
+- `snapshots/{YYYY-MM}`: stoku dhe borxhi në fund të muajit, krijohet një herë (rules: vetëm create). Mos shto listener-a mbi koleksione të plota te Paneli.
+- Agregimet: një kërkesë për çdo fushë (`aggregate()` te invoiceService) – Firestore kërkon indeks për çdo kombinim fushash të mbledhura.
+
 ## Siguria e repo-s
 `data/`, `firebase-config*.txt`, `.env` nuk shkojnë kurrë në git. Konfigurimi i Firebase vjen nga `VITE_FIREBASE_*` (lokalisht `.env`, në CI GitHub Secrets).
 

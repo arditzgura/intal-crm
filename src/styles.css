@@ -820,3 +820,8 @@ th.sortable.sorted .sort-icon { opacity: 1; }
 .d2-change-value small { font-size: 0.75rem; opacity: 0.55; }
 .d2-change-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .d2-change small { font-size: 0.74rem; }
+
+.d2-refresh { display: flex; align-items: center; gap: 10px; }
+.d2-refresh .btn { display: inline-flex; align-items: center; gap: 6px; }
+@keyframes d2spin { to { transform: rotate(360deg); } }
+.spin { animation: d2spin 1s linear infinite; }

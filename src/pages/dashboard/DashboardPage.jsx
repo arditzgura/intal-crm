@@ -1,23 +1,25 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Wallet, Landmark, Truck, Warehouse, ArrowRight } from 'lucide-react'
+import { Wallet, Landmark, Truck, Warehouse, ArrowRight, RefreshCw } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
-import { watchClients } from '../../services/clientService'
-import { watchItems, watchItemCosts } from '../../services/itemService'
-import { watchStock, movementsSince } from '../../services/stockService'
-import { ledgerSince } from '../../services/ledgerService'
 import { watchCashBalances } from '../../services/cashService'
-import { invoiceSummary, invoiceProfit, itemSalesTotals, monthlySales } from '../../services/invoiceService'
+import { invoiceSummary, itemSalesTotals } from '../../services/invoiceService'
+import {
+  liveTotals, monthKey, profitFrom, readCosts, readItems, readStats, refreshStats, statsStale, topItemsFrom,
+} from '../../services/dashboardService'
 import { errorMessage } from '../../services/authService'
 import { canSeeCost } from '../../config/roles'
 import { formatMoney } from '../../utils/money'
-import { periodLabel, periodRange } from '../../utils/date'
+import { periodLabel, periodRange, toDate } from '../../utils/date'
 import PeriodFilter, { defaultPeriod } from '../../components/PeriodFilter'
 
 const MONTHS = ['Jan', 'Shk', 'Mar', 'Pri', 'Maj', 'Qer', 'Kor', 'Gus', 'Sht', 'Tet', 'Nën', 'Dhj']
 
-/** Paneli: pasqyra përmbledhëse e biznesit. */
+/**
+ * Paneli: pasqyra përmbledhëse e biznesit, me pak lexime (shih dashboardService):
+ * përmbledhjet dhe borxhi nga serveri (sum/count), statistikat e rënda nga `stats/paneli`.
+ */
 export default function DashboardPage() {
   const { perms } = useAuth()
   const showProfit = canSeeCost(perms)
@@ -25,105 +27,74 @@ export default function DashboardPage() {
   const [period, setPeriod] = useState(() => ({ ...defaultPeriod(), kind: 'month' }))
   const range = useMemo(() => periodRange(period), [period])
   const label = periodLabel(period)
+  const isCurrentMonth = period.kind === 'month' && period.month === monthKey(new Date())
 
-  const { data: clients } = useLive(watchClients, [], { initial: [] })
-  const { data: items } = useLive(watchItems, [], { initial: [] })
-  const { data: costs } = useLive(watchItemCosts, [], { enabled: showProfit, initial: {} })
-  const { data: stock } = useLive(watchStock, [], { initial: {} })
   const { data: cash } = useLive(watchCashBalances, [], { enabled: canCash, initial: { arke: {}, banke: {} } })
 
   const [sum, setSum] = useState(null)
-  const [profit, setProfit] = useState(null)
   const [allSum, setAllSum] = useState(null)
-  const [allProfit, setAllProfit] = useState(null)
-  const [itemSales, setItemSales] = useState(null)
-  const [months, setMonths] = useState(null)
+  const [totals, setTotals] = useState(null)
+  const [stats, setStats] = useState(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [custom, setCustom] = useState(null)
   const [error, setError] = useState('')
+  const catalog = useRef(null)
 
   useEffect(() => {
     let cancelled = false
     setSum(null)
-    setItemSales(null)
     invoiceSummary(range).then((s) => !cancelled && setSum(s)).catch((err) => !cancelled && setError(errorMessage(err)))
     return () => { cancelled = true }
   }, [range])
 
-  const itemKey = items.map((i) => i.id).join(',')
-  useEffect(() => {
-    if (!items.length) return undefined
-    let cancelled = false
-    setItemSales(null)
-    itemSalesTotals(items.map((i) => i.id), range).then((r) => !cancelled && setItemSales(r)).catch(() => !cancelled && setItemSales({}))
-    return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemKey, range])
-
-  const costKey = Object.keys(costs).length
-  useEffect(() => {
-    if (!showProfit || !items.length || !costKey) return undefined
-    let cancelled = false
-    setProfit(null)
-    invoiceProfit(range, items.map((i) => i.id), costs).then((p) => !cancelled && setProfit(p)).catch(() => !cancelled && setProfit(undefined))
-    return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [range, showProfit, itemKey, costKey])
-
-  // Lëvizjet që nga fillimi i muajit: për gjendjen në fund të muajit paraardhës
-  const [stockDelta, setStockDelta] = useState(null)
-  const [ledgerDelta, setLedgerDelta] = useState(null)
-  const monthStart = useMemo(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) }, [])
-  const prevMonthEnd = new Date(monthStart.getTime() - 1)
-  useEffect(() => {
-    movementsSince(monthStart).then(setStockDelta).catch(() => setStockDelta(undefined))
-    ledgerSince(monthStart).then(setLedgerDelta).catch(() => setLedgerDelta(undefined))
-  }, [monthStart])
+  const refresh = useCallback(() => {
+    setRefreshing(true)
+    refreshStats(showProfit)
+      .then(setStats)
+      .catch((err) => setError(errorMessage(err)))
+      .finally(() => setRefreshing(false))
+  }, [showProfit])
 
   useEffect(() => {
-    monthlySales(12).then(setMonths).catch(() => setMonths([]))
     invoiceSummary({}).then(setAllSum).catch((err) => setError(errorMessage(err)))
-  }, [])
+    liveTotals().then(setTotals).catch((err) => setError(errorMessage(err)))
+    readStats(showProfit)
+      .then((s) => {
+        if (s.base) setStats(s)
+        if (statsStale(s, showProfit)) refresh()
+      })
+      .catch((err) => setError(errorMessage(err)))
+  }, [showProfit, refresh])
 
-  // Fitimi akumuluar (gjithë kohës)
+  // Periudhë tjetër nga muaji aktual: shitjet për artikull llogariten vetëm kur zgjidhet.
   useEffect(() => {
-    if (!showProfit || !items.length || !costKey) return undefined
+    if (isCurrentMonth) return undefined
     let cancelled = false
-    invoiceProfit({}, items.map((i) => i.id), costs).then((p) => !cancelled && setAllProfit(p)).catch(() => !cancelled && setAllProfit(undefined))
+    setCustom(null)
+    ;(async () => {
+      catalog.current ??= await Promise.all([readItems(), showProfit ? readCosts() : {}])
+      const [items, costs] = catalog.current
+      const sales = await itemSalesTotals(items.map((i) => i.id), range)
+      if (!cancelled) setCustom({ topItems: topItemsFrom(sales, items), profit: showProfit ? profitFrom(sales, costs) : null })
+    })().catch((err) => !cancelled && setError(errorMessage(err)))
     return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showProfit, itemKey, costKey])
+  }, [isCurrentMonth, range, showProfit])
 
-  // Detyrimet aktuale
-  const debt = {}
-  const payables = {}
-  let debtors = 0
-  for (const c of clients) {
-    let has = false
-    for (const [m, v] of Object.entries(c.gjendje ?? {})) if (v > 0) { debt[m] = (debt[m] ?? 0) + v; has = true }
-    if (has) debtors += 1
-    for (const [m, v] of Object.entries(c.detyrimFurnitori ?? {})) if (v > 0) payables[m] = (payables[m] ?? 0) + v
-  }
+  const base = stats?.base
+  const cost = stats?.cost
+  const months = base?.months ?? null
+  const topItems = isCurrentMonth ? base?.topItems ?? null : custom?.topItems ?? null
+  const profit = isCurrentMonth ? cost?.profitMonth : custom?.profit
+  const allProfit = cost?.profitAll
 
-  // Vlera e stokut (sot dhe në fund të muajit paraardhës, me çmimet aktuale)
-  let stockSale = 0
-  let stockCost = 0
-  let prevSale = 0
-  let prevCost = 0
-  for (const i of items.filter((x) => !x.arkivuar)) {
-    const q = Math.max(0, stock[i.id] ?? 0)
-    const qp = Math.max(0, (stock[i.id] ?? 0) - (stockDelta?.[i.id] ?? 0))
-    stockSale += q * (i.cmimi ?? 0)
-    prevSale += qp * (i.cmimi ?? 0)
-    if (costs[i.id] != null) { stockCost += q * costs[i.id]; prevCost += qp * costs[i.id] }
-  }
-
-  // Borxhi në fund të muajit paraardhës: gjendja e çdo klienti − lëvizjet e këtij muaji
-  let prevDebt = 0
-  if (ledgerDelta) {
-    for (const c of clients) prevDebt += Math.max(0, (c.gjendje?.LEK ?? 0) - (ledgerDelta[c.id]?.LEK ?? 0))
-  }
-  const topItems = itemSales
-    ? items.map((i) => ({ i, ...itemSales[i.id] })).filter((x) => x.totali > 0).sort((a, b) => b.totali - a.totali).slice(0, 5)
-    : null
+  const debt = totals?.debt ?? {}
+  const debtors = totals?.debtors?.LEK ?? 0
+  const payables = totals?.payables ?? {}
+  const stockSale = base?.stockSale ?? 0
+  const prevSale = base?.prevStockSale ?? 0
+  const stockCost = cost?.stockCost ?? 0
+  const prevCost = cost?.prevStockCost ?? 0
+  const prevDebt = base?.prevDebt ?? 0
 
   const lek = (m) => m?.LEK ?? 0
   const extra = (m) => Object.entries(m ?? {}).filter(([c, v]) => c !== 'LEK' && v).map(([c, v]) => formatMoney(v, c)).join(' · ')
@@ -131,17 +102,28 @@ export default function DashboardPage() {
 
   const pct = (a, b) => (b ? `${Math.round((a * 1000) / b) / 10}%` : '—')
   const signed = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${formatMoney(Math.abs(v))}`
+  const now = new Date()
+  const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0)
   const prevLabel = prevMonthEnd.toLocaleDateString('sq-AL', { day: 'numeric', month: 'long', year: 'numeric' })
   const stockChange = stockSale - prevSale
   const debtChange = lek(debt) - prevDebt
   const itemsTotal = topItems ? topItems.reduce((a, x) => a + x.totali, 0) : 0
+  const updatedAt = toDate(base?.perditesuar)
 
   return (
     <div className="dashboard dash2">
       <div className="page-head">
         <div>
           <h1 className="page-title">Paneli</h1>
-          <div className="muted small">Pasqyra e biznesit për INTAL ALBANIA · {new Date().toLocaleDateString('sq-AL', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+          <div className="muted small">Pasqyra e biznesit për INTAL ALBANIA · {now.toLocaleDateString('sq-AL', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+        </div>
+        <div className="d2-refresh">
+          <span className="muted small">
+            {refreshing ? 'Duke rillogaritur statistikat…' : updatedAt ? `Statistikat: ${updatedAt.toLocaleString('sq-AL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : ''}
+          </span>
+          <button type="button" className="btn small" onClick={refresh} disabled={refreshing} title="Rillogarit grafikun, artikujt, stokun dhe fitimin">
+            <RefreshCw size={14} className={refreshing ? 'spin' : ''} /> Rifresko
+          </button>
         </div>
       </div>
       {error && <div className="alert error">{error}</div>}
@@ -160,7 +142,7 @@ export default function DashboardPage() {
         {showProfit && (
           <div className="d2-kpi top-green" title="Shitjet në LEK − sasia × kosto aktuale e artikujve">
             <span className="d2-kpi-label">Fitimi akumuluar (LEK)</span>
-            <b className="d2-kpi-value c-green">{allProfit == null ? '…' : allProfit === undefined ? '—' : formatMoney(allProfit)}</b>
+            <b className="d2-kpi-value c-green">{allProfit == null ? '…' : formatMoney(allProfit)}</b>
             <div className="d2-kpi-foot">
               <span className="pill pill-green">Marzhi {allSum && allProfit != null ? pct(allProfit, lek(allSum.sales)) : '…'}</span>
               <span className="muted">pas kostos së blerjes</span>
@@ -177,9 +159,9 @@ export default function DashboardPage() {
         </div>
         <div className="d2-kpi top-red">
           <span className="d2-kpi-label">Detyrime të mbetura (LEK)</span>
-          <b className="d2-kpi-value c-red">{formatMoney(lek(debt))}</b>
+          <b className="d2-kpi-value c-red">{totals ? formatMoney(lek(debt)) : '…'}</b>
           <div className="d2-kpi-foot">
-            <span className="pill pill-red">{debtors} klientë</span>
+            <span className="pill pill-red">{totals ? `${debtors} klientë` : '…'}</span>
             <Link to="/raporte?raporti=borxhet" className="d2-link">Shiko listën <ArrowRight size={11} /></Link>
           </div>
         </div>
@@ -203,7 +185,7 @@ export default function DashboardPage() {
           {showProfit && (
             <div title="Shitjet në LEK − sasia × kosto aktuale e artikujve">
               <span>Fitimi</span>
-              <b className="c-green">{profit == null ? '…' : profit === undefined ? '—' : `${profit >= 0 ? '+' : ''}${formatMoney(profit)}`} <small>L</small></b>
+              <b className="c-green">{profit == null ? '…' : `${profit >= 0 ? '+' : ''}${formatMoney(profit)}`} <small>L</small></b>
               <em>{sum && profit != null && lek(sum.sales) ? `Marzhi ${pct(profit, lek(sum.sales))}` : ''}</em>
             </div>
           )}
@@ -222,9 +204,9 @@ export default function DashboardPage() {
 
       <div className="dash-stats">
         {canCash && <Stat icon={Landmark} label="Arka + Banka (sot)" value={formatMoney(lek(cash.arke) + lek(cash.banke), 'LEK')} sub={`Arkë ${formatMoney(lek(cash.arke))} · Bankë ${formatMoney(lek(cash.banke))}`} />}
-        <Stat icon={Wallet} label="Klientë me borxh" value={String(debtors)} cls="neg" />
-        <Stat icon={Truck} label="Detyrime ndaj furnitorëve" value={formatMoney(lek(payables), 'LEK')} />
-        <Stat icon={Warehouse} label="Vlera e stokut (çmim shitje)" value={formatMoney(stockSale, 'LEK')} sub={showProfit ? `Me kosto: ${formatMoney(stockCost, 'LEK')}` : ''} />
+        <Stat icon={Wallet} label="Klientë me borxh" value={totals ? String(debtors) : '…'} sub={extra(debt) ? `+ ${extra(debt)}` : ''} cls="neg" />
+        <Stat icon={Truck} label="Detyrime ndaj furnitorëve" value={totals ? formatMoney(lek(payables), 'LEK') : '…'} />
+        <Stat icon={Warehouse} label="Vlera e stokut (çmim shitje)" value={base ? formatMoney(stockSale, 'LEK') : '…'} sub={showProfit && cost ? `Me kosto: ${formatMoney(stockCost, 'LEK')}` : ''} />
       </div>
 
       <div className="d2-grid">
@@ -266,24 +248,24 @@ export default function DashboardPage() {
           <div className="d2-changes">
             <div className="d2-change">
               <span className="d2-change-label">Gjendja e inventarit</span>
-              <b className="d2-change-value">{formatMoney(stockSale)} <small>L</small></b>
-              <small className="muted">Vlera e mallit në gjendje (çmim shitje){showProfit ? ` · me kosto ${formatMoney(stockCost)} L` : ''}</small>
+              <b className="d2-change-value">{base ? formatMoney(stockSale) : '…'} <small>L</small></b>
+              <small className="muted">Vlera e mallit në gjendje (çmim shitje){showProfit && cost ? ` · me kosto ${formatMoney(stockCost)} L` : ''}</small>
             </div>
             <div className="d2-change">
               <span className="d2-change-label">Ndryshimi i inventarit</span>
-              {stockDelta === undefined ? <b className="d2-change-value muted">—</b> : !stockDelta ? <b className="d2-change-value">…</b> : (
+              {!base ? <b className="d2-change-value">…</b> : (
                 <>
                   <div className="d2-change-row">
                     <b className={`d2-change-value ${stockChange >= 0 ? 'c-green' : 'c-red'}`}>{signed(stockChange)} <small>L</small></b>
                     <span className={`pill ${stockChange >= 0 ? 'pill-green' : 'pill-red'}`}>{stockChange >= 0 ? '▲' : '▼'} {pct(Math.abs(stockChange), prevSale)}</span>
                   </div>
-                  <small className="muted">{formatMoney(prevSale)} → {formatMoney(stockSale)} L{showProfit ? ` · me kosto ${signed(stockCost - prevCost)} L` : ''}</small>
+                  <small className="muted">{formatMoney(prevSale)} → {formatMoney(stockSale)} L{showProfit && cost ? ` · me kosto ${signed(stockCost - prevCost)} L` : ''}</small>
                 </>
               )}
             </div>
             <div className="d2-change">
               <span className="d2-change-label">Ndryshimi i borxhit</span>
-              {ledgerDelta === undefined ? <b className="d2-change-value muted">—</b> : !ledgerDelta ? <b className="d2-change-value">…</b> : (
+              {!base || !totals ? <b className="d2-change-value">…</b> : (
                 <>
                   <div className="d2-change-row">
                     <b className={`d2-change-value ${debtChange > 0 ? 'c-red' : 'c-green'}`}>{signed(debtChange)} <small>L</small></b>
@@ -311,10 +293,10 @@ export default function DashboardPage() {
           </thead>
           <tbody>
             {!topItems && <tr><td colSpan={4} className="muted">Duke u ngarkuar…</td></tr>}
-            {topItems?.map(({ i, totali, sasia }) => (
-              <tr key={i.id}>
-                <td><Link to={`/artikujt/${i.id}`}><b>{i.emri}</b></Link></td>
-                <td className="num">{sasia} <span className="muted">{i.njesia}</span></td>
+            {topItems?.map(({ id, emri, njesia, totali, sasia }) => (
+              <tr key={id}>
+                <td><Link to={`/artikujt/${id}`}><b>{emri}</b></Link></td>
+                <td className="num">{sasia} <span className="muted">{njesia}</span></td>
                 <td className="num"><b>{formatMoney(totali)}</b></td>
                 <td className="d2-share-col">
                   <div className="d2-share"><div className="d2-meter-track indigo"><div style={{ width: `${(totali / (itemsTotal || 1)) * 100}%` }} /></div><span>{pct(totali, itemsTotal)}</span></div>
