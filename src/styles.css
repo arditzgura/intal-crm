@@ -743,3 +743,12 @@ th.sortable.sorted .sort-icon { opacity: 1; }
 .acc-green { color: #15803d; }
 .kpi-value.pos { color: var(--success); }
 .kpi-value.neg { color: var(--danger); }
+
+/* Paneli: kartat e periudhës – të vogla dhe minimaliste (ngjyra e shkrimit ruhet) */
+.dash-main { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.dash-main .kpi { border-radius: 12px; padding: 12px 16px; box-shadow: none; background: #fff; border: 1px solid var(--border); }
+.dash-main .kpi > span { font-size: 0.66rem; letter-spacing: 0.5px; margin-bottom: 4px; }
+.dash-main .kpi-value { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.3px; }
+.dash-main .kpi-value small { font-size: 0.75rem; }
+.dash-main .kpi-sub { font-size: 0.7rem; margin-top: 3px; }
+.dash-main .kpi-icon { display: none; }
