@@ -505,6 +505,16 @@ export async function invoicesByIds(ids) {
 }
 
 /**
+ * Agregim nga serveri me një kërkesë për çdo fushë: Firestore kërkon indeks të veçantë për
+ * çdo kombinim fushash të mbledhura, ndaj secila sum/count shkon më vete dhe bashkohet këtu.
+ * Kthen { alias: vlera } (si r.data()).
+ */
+async function aggregate(q, spec) {
+  const entries = await Promise.all(Object.entries(spec).map(async ([k, a]) => [k, (await getAggregateFromServer(q, { [k]: a })).data()[k]]))
+  return Object.fromEntries(entries)
+}
+
+/**
  * Përmbledhja e periudhës, e llogaritur nga serveri (sum / count) pa lexuar faturat:
  * numri i faturave, shitjet, arkëtimet (pagesat e klientëve) dhe borxhi i papaguar,
  * secila sipas monedhës. Faturat e anuluara dhe draftet nuk përfshihen.
@@ -515,12 +525,12 @@ export async function invoiceSummary(range) {
     const inv = companyCol('invoices')
     // Një kërkesë për çdo status (barazi) – përdor indekset (monedha, statusi[, data]).
     const perStatus = await Promise.all(ISSUED.map((st) =>
-      getAggregateFromServer(query(inv, where('monedha', '==', cur), where('statusi', '==', st), ...rangeCons(range)), { n: count(), s: sum('totali'), m: sum('mbetur') }),
+      aggregate(query(inv, where('monedha', '==', cur), where('statusi', '==', st), ...rangeCons(range)), { n: count(), s: sum('totali'), ...(st === 'pa_paguar' ? { m: sum('mbetur') } : {}) }),
     ))
     perStatus.forEach((r, i) => {
-      out.count += r.data().n
-      if (r.data().s) out.sales[cur] = (out.sales[cur] ?? 0) + r.data().s
-      if (ISSUED[i] === 'pa_paguar' && r.data().m) out.unpaid[cur] = r.data().m
+      out.count += r.n
+      if (r.s) out.sales[cur] = (out.sales[cur] ?? 0) + r.s
+      if (ISSUED[i] === 'pa_paguar' && r.m) out.unpaid[cur] = r.m
     })
     try {
       const c = await getAggregateFromServer(query(companyCol('ledger'), where('tipi', '==', 'pagese'), where('monedha', '==', cur), ...rangeCons(range)), { s: sum('shuma') })
@@ -541,11 +551,11 @@ export async function invoiceProfit(range, itemIds, costs) {
   const withCost = itemIds.filter((id) => costs[id] != null)
   for (let i = 0; i < withCost.length; i += 20) {
     await Promise.all(withCost.slice(i, i + 20).map(async (itemId) => {
-      const r = await getAggregateFromServer(
+      const r = await aggregate(
         query(companyCol('invoiceLines'), where('itemId', '==', itemId), where('monedha', '==', 'LEK'), where('anuluar', '==', false), ...rangeCons(range)),
         { t: sum('totali'), q: sum('sasia') },
       )
-      profit += (r.data().t ?? 0) - (r.data().q ?? 0) * costs[itemId]
+      profit += (r.t ?? 0) - (r.q ?? 0) * costs[itemId]
     }))
   }
   return profit
@@ -559,11 +569,11 @@ export async function itemSalesTotals(itemIds, range) {
   const out = {}
   for (let i = 0; i < itemIds.length; i += 20) {
     await Promise.all(itemIds.slice(i, i + 20).map(async (itemId) => {
-      const r = await getAggregateFromServer(
+      const r = await aggregate(
         query(companyCol('invoiceLines'), where('itemId', '==', itemId), where('monedha', '==', 'LEK'), where('anuluar', '==', false), ...rangeCons(range)),
         { t: sum('totali'), q: sum('sasia') },
       )
-      out[itemId] = { totali: r.data().t ?? 0, sasia: r.data().q ?? 0 }
+      out[itemId] = { totali: r.t ?? 0, sasia: r.q ?? 0 }
     }))
   }
   return out
@@ -577,14 +587,14 @@ export async function monthlySales(months = 12) {
     const from = new Date(d.getFullYear(), d.getMonth(), 1)
     const to = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
     // Një kërkesë për çdo status (barazi), pa "in" – përdor indeksin (monedha, statusi, data).
-    const parts = await Promise.all(ISSUED.map((st) => getAggregateFromServer(
+    const parts = await Promise.all(ISSUED.map((st) => aggregate(
       query(companyCol('invoices'), where('monedha', '==', 'LEK'), where('statusi', '==', st), ...rangeCons({ from, to })),
       { t: sum('totali'), n: count() },
     )))
     return {
       key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-      totali: parts.reduce((a, r) => a + (r.data().t ?? 0), 0),
-      fatura: parts.reduce((a, r) => a + r.data().n, 0),
+      totali: parts.reduce((a, r) => a + (r.t ?? 0), 0),
+      fatura: parts.reduce((a, r) => a + r.n, 0),
     }
   }))
 }
