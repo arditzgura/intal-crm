@@ -1,4 +1,4 @@
-import { onSnapshot, query, runTransaction, serverTimestamp, where } from 'firebase/firestore'
+import { getDocs, onSnapshot, query, runTransaction, serverTimestamp, where } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { companyCol, companyDoc, newDocRef } from './paths'
 import { addAudit } from './auditService'
@@ -24,6 +24,21 @@ export function watchClientLedger(clientId, onData, onError) {
     (snap) => onData(sortLedger(snap.docs.map((d) => ({ id: d.id, ...d.data() })))),
     onError,
   )
+}
+
+/**
+ * Σ shuma e lëvizjeve të kartelës me datë ≥ `from`, për klient dhe monedhë:
+ * { clientId: { MONEDHA: shuma } }. Gjendja para `from` = gjendja aktuale − kjo shumë.
+ */
+export async function ledgerSince(from) {
+  const snap = await getDocs(query(companyCol('ledger'), where('data', '>=', from)))
+  const out = {}
+  for (const d of snap.docs) {
+    const { clientId, monedha, shuma } = d.data()
+    const c = (out[clientId] ??= {})
+    c[monedha] = (c[monedha] ?? 0) + (shuma ?? 0)
+  }
+  return out
 }
 
 export function sortLedger(entries) {

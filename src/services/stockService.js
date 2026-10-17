@@ -75,6 +75,20 @@ export function watchMovementsForItem(itemId, onData, onError) {
   )
 }
 
+/**
+ * Σ sasia e lëvizjeve me datë ≥ `from`, për artikull: { itemId: sasia }.
+ * Stoku në fund të ditës para `from` = stoku aktual − kjo shumë.
+ */
+export async function movementsSince(from) {
+  const snap = await getDocs(query(companyCol('stockMovements'), where('data', '>=', from)))
+  const out = {}
+  for (const d of snap.docs) {
+    const { itemId, sasia } = d.data()
+    out[itemId] = (out[itemId] ?? 0) + (sasia ?? 0)
+  }
+  return out
+}
+
 export const PAGE = 50
 
 /** Regjistri i lëvizjeve (të gjitha artikujt), me faqe. */

@@ -5,7 +5,8 @@ import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
 import { watchClients } from '../../services/clientService'
 import { watchItems, watchItemCosts } from '../../services/itemService'
-import { watchStock } from '../../services/stockService'
+import { watchStock, movementsSince } from '../../services/stockService'
+import { ledgerSince } from '../../services/ledgerService'
 import { watchCashBalances } from '../../services/cashService'
 import { invoiceSummary, invoiceProfit, itemSalesTotals, monthlySales } from '../../services/invoiceService'
 import { errorMessage } from '../../services/authService'
@@ -67,6 +68,16 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range, showProfit, itemKey, costKey])
 
+  // Lëvizjet që nga fillimi i muajit: për gjendjen në fund të muajit paraardhës
+  const [stockDelta, setStockDelta] = useState(null)
+  const [ledgerDelta, setLedgerDelta] = useState(null)
+  const monthStart = useMemo(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) }, [])
+  const prevMonthEnd = new Date(monthStart.getTime() - 1)
+  useEffect(() => {
+    movementsSince(monthStart).then(setStockDelta).catch(() => setStockDelta(undefined))
+    ledgerSince(monthStart).then(setLedgerDelta).catch(() => setLedgerDelta(undefined))
+  }, [monthStart])
+
   useEffect(() => {
     monthlySales(12).then(setMonths).catch(() => setMonths([]))
     invoiceSummary({}).then(setAllSum).catch((err) => setError(errorMessage(err)))
@@ -91,15 +102,24 @@ export default function DashboardPage() {
     if (has) debtors += 1
     for (const [m, v] of Object.entries(c.detyrimFurnitori ?? {})) if (v > 0) payables[m] = (payables[m] ?? 0) + v
   }
-  const topDebtors = clients.filter((c) => (c.gjendje?.LEK ?? 0) > 0).sort((a, b) => b.gjendje.LEK - a.gjendje.LEK).slice(0, 5)
 
-  // Vlera e stokut
+  // Vlera e stokut (sot dhe në fund të muajit paraardhës, me çmimet aktuale)
   let stockSale = 0
   let stockCost = 0
+  let prevSale = 0
+  let prevCost = 0
   for (const i of items.filter((x) => !x.arkivuar)) {
     const q = Math.max(0, stock[i.id] ?? 0)
+    const qp = Math.max(0, (stock[i.id] ?? 0) - (stockDelta?.[i.id] ?? 0))
     stockSale += q * (i.cmimi ?? 0)
-    if (costs[i.id] != null) stockCost += q * costs[i.id]
+    prevSale += qp * (i.cmimi ?? 0)
+    if (costs[i.id] != null) { stockCost += q * costs[i.id]; prevCost += qp * costs[i.id] }
+  }
+
+  // Borxhi në fund të muajit paraardhës: gjendja e çdo klienti − lëvizjet e këtij muaji
+  let prevDebt = 0
+  if (ledgerDelta) {
+    for (const c of clients) prevDebt += Math.max(0, (c.gjendje?.LEK ?? 0) - (ledgerDelta[c.id]?.LEK ?? 0))
   }
   const topItems = itemSales
     ? items.map((i) => ({ i, ...itemSales[i.id] })).filter((x) => x.totali > 0).sort((a, b) => b.totali - a.totali).slice(0, 5)
@@ -110,7 +130,10 @@ export default function DashboardPage() {
   const maxMonth = months ? Math.max(1, ...months.map((m) => m.totali)) : 1
 
   const pct = (a, b) => (b ? `${Math.round((a * 1000) / b) / 10}%` : '—')
-  const maxDebt = topDebtors[0]?.gjendje.LEK ?? 1
+  const signed = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${formatMoney(Math.abs(v))}`
+  const prevLabel = prevMonthEnd.toLocaleDateString('sq-AL', { day: 'numeric', month: 'long', year: 'numeric' })
+  const stockChange = stockSale - prevSale
+  const debtChange = lek(debt) - prevDebt
   const itemsTotal = topItems ? topItems.reduce((a, x) => a + x.totali, 0) : 0
 
   return (
@@ -236,22 +259,40 @@ export default function DashboardPage() {
         <div className="d2-panel">
           <div className="d2-panel-head">
             <div>
-              <h3>Klientët me borxhin më të madh</h3>
-              <p>Detyrimi aktual në LEK</p>
+              <h3>Inventari dhe borxhi</h3>
+              <p>Krahasuar me {prevLabel} (fundi i muajit paraardhës)</p>
             </div>
           </div>
-          <div className="d2-meters">
-            {topDebtors.map((c) => (
-              <div key={c.id} className="d2-meter">
-                <div className="d2-meter-top">
-                  <Link to={`/kliente/${c.id}`} className="client-link">{c.emri}</Link>
-                  <b className="c-red">{formatMoney(c.gjendje.LEK)}</b>
-                </div>
-                <div className="d2-meter-track"><div style={{ width: `${Math.max(3, (c.gjendje.LEK / maxDebt) * 100)}%` }} /></div>
-                <small className="muted">{c.qyteti || '—'} · {pct(c.gjendje.LEK, lek(debt))} e borxhit total</small>
-              </div>
-            ))}
-            {!topDebtors.length && <p className="muted">Asnjë klient me borxh.</p>}
+          <div className="d2-changes">
+            <div className="d2-change">
+              <span className="d2-change-label">Gjendja e inventarit</span>
+              <b className="d2-change-value">{formatMoney(stockSale)} <small>L</small></b>
+              <small className="muted">Vlera e mallit në gjendje (çmim shitje){showProfit ? ` · me kosto ${formatMoney(stockCost)} L` : ''}</small>
+            </div>
+            <div className="d2-change">
+              <span className="d2-change-label">Ndryshimi i inventarit</span>
+              {stockDelta === undefined ? <b className="d2-change-value muted">—</b> : !stockDelta ? <b className="d2-change-value">…</b> : (
+                <>
+                  <div className="d2-change-row">
+                    <b className={`d2-change-value ${stockChange >= 0 ? 'c-green' : 'c-red'}`}>{signed(stockChange)} <small>L</small></b>
+                    <span className={`pill ${stockChange >= 0 ? 'pill-green' : 'pill-red'}`}>{stockChange >= 0 ? '▲' : '▼'} {pct(Math.abs(stockChange), prevSale)}</span>
+                  </div>
+                  <small className="muted">{formatMoney(prevSale)} → {formatMoney(stockSale)} L{showProfit ? ` · me kosto ${signed(stockCost - prevCost)} L` : ''}</small>
+                </>
+              )}
+            </div>
+            <div className="d2-change">
+              <span className="d2-change-label">Ndryshimi i borxhit</span>
+              {ledgerDelta === undefined ? <b className="d2-change-value muted">—</b> : !ledgerDelta ? <b className="d2-change-value">…</b> : (
+                <>
+                  <div className="d2-change-row">
+                    <b className={`d2-change-value ${debtChange > 0 ? 'c-red' : 'c-green'}`}>{signed(debtChange)} <small>L</small></b>
+                    <span className={`pill ${debtChange > 0 ? 'pill-red' : 'pill-green'}`}>{debtChange > 0 ? '▲' : '▼'} {pct(Math.abs(debtChange), prevDebt)}</span>
+                  </div>
+                  <small className="muted">{formatMoney(prevDebt)} → {formatMoney(lek(debt))} L · {debtChange > 0 ? 'borxhi u rrit' : 'borxhi u ul'}</small>
+                </>
+              )}
+            </div>
           </div>
           <Link to="/raporte?raporti=borxhet" className="d2-link d2-foot-link">Shiko të gjitha borxhet <ArrowRight size={12} /></Link>
         </div>

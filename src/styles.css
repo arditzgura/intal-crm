@@ -810,3 +810,13 @@ th.sortable.sorted .sort-icon { opacity: 1; }
 .d2-share { display: flex; align-items: center; gap: 10px; }
 .d2-share span { font-size: 0.8rem; font-weight: 700; color: #4338ca; min-width: 44px; text-align: right; }
 @media (max-width: 900px) { .d2-grid { grid-template-columns: 1fr; } .d2-strip > div { border-left: 0; padding: 6px 0; } }
+
+/* Paneli: inventari dhe borxhi krahasuar me fundin e muajit paraardhës */
+.d2-changes { display: flex; flex-direction: column; }
+.d2-change { display: flex; flex-direction: column; gap: 4px; padding: 14px 0; border-top: 1px solid #f1f5f9; }
+.d2-change:first-child { border-top: 0; padding-top: 0; }
+.d2-change-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: #94a3b8; }
+.d2-change-value { font-size: 1.45rem; font-weight: 800; color: #0f172a; font-variant-numeric: tabular-nums; }
+.d2-change-value small { font-size: 0.75rem; opacity: 0.55; }
+.d2-change-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.d2-change small { font-size: 0.74rem; }
