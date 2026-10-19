@@ -3,6 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Printer, FileDown, Image as ImageIcon, MessageCircle, Ban, Pencil } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
+import { onSnapshot } from 'firebase/firestore'
+import { companyDoc } from '../../services/paths'
 import { useSettings } from '../../hooks/useSettings'
 import { watchInvoice, cancelInvoice, watchAuditFor } from '../../services/invoiceService'
 import { STATUS_LABELS } from '../../services/invoiceChain'
@@ -27,6 +29,11 @@ export default function InvoiceViewPage() {
   const [cancelling, setCancelling] = useState(false)
 
   const { data: inv, loading, error } = useLive((ok, ko) => watchInvoice(id, ok, ko), [id])
+  // Pikët aktuale të klientit (për faturat e vjetra pa piketKlientit në printimin 80 mm)
+  const { data: clientPoints } = useLive(
+    (ok, ko) => onSnapshot(companyDoc('clients', inv.clientId), (snap) => ok(snap.exists() ? snap.data().piket ?? 0 : null), ko),
+    [inv?.clientId], { enabled: !!inv?.clientId && format === 'termik' && inv?.piketKlientit == null, initial: null },
+  )
   const canSeeLog = perms.has('mod_historiku') || perms.has('sheh_logun')
   const { data: log } = useLive((ok, ko) => watchAuditFor('invoices', id, ok, ko), [id], { enabled: canSeeLog, initial: [] })
 
@@ -116,7 +123,7 @@ export default function InvoiceViewPage() {
 
       <div className="invoice-preview">
         <div className="invoice-print-area">
-          <InvoiceDocument ref={docRef} invoice={inv} settings={settings} format={format} />
+          <InvoiceDocument ref={docRef} invoice={inv} settings={settings} format={format} clientPoints={clientPoints} />
         </div>
       </div>
 

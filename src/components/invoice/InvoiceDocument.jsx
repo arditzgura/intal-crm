@@ -7,7 +7,7 @@ import { formatDate, toDate } from '../../utils/date'
  * Shablloni, fontet, watermark-u dhe etiketat vijnë nga Cilësimet.
  * Shumat janë "fotografia" e lëshimit (nuk ndryshojnë më pas).
  */
-const InvoiceDocument = forwardRef(function InvoiceDocument({ invoice, settings, format = 'a4' }, ref) {
+const InvoiceDocument = forwardRef(function InvoiceDocument({ invoice, settings, format = 'a4', clientPoints = null }, ref) {
   const k = settings.kompania
   const f = settings.fatura
   const L = settings.etiketat
@@ -28,6 +28,13 @@ const InvoiceDocument = forwardRef(function InvoiceDocument({ invoice, settings,
     const sym = cur === 'LEK' ? 'L' : cur === 'EUR' ? '€' : '$'
     const paid = invoice.statusi === 'e_paguar'
     const city = k1.qyteti ? ` (${k1.qyteti})` : ''
+    // Pikët: ato të ruajtura në lëshim; për faturat e vjetra, pikët aktuale të klientit.
+    const points = k1.rastesor ? null : invoice.piketKlientit ?? clientPoints
+    const shuma = invoice.totali ?? 0
+    const gjPara = isDraft ? 0 : invoice.gjendjaPara ?? 0
+    const gjithsej = shuma + gjPara
+    const paguar = isDraft ? 0 : invoice.paguar ?? 0
+    const partial = paguar > 0 && paguar < gjithsej
     return (
       <div ref={ref} className="inv inv-thermal th2" style={{ width: `${f.gjeresiaTermike}mm` }}>
         <div className="th2-head">
@@ -47,10 +54,10 @@ const InvoiceDocument = forwardRef(function InvoiceDocument({ invoice, settings,
             <small>{L.klienti.toUpperCase()}</small>
             <b>{k1.emri}{city}</b>
           </div>
-          {invoice.piketKlientit != null && (
+          {points != null && (
             <div className="th2-box th2-points">
               <small>PIKËT</small>
-              <b>{invoice.piketKlientit}</b>
+              <b>{points}</b>
             </div>
           )}
         </div>
@@ -64,8 +71,22 @@ const InvoiceDocument = forwardRef(function InvoiceDocument({ invoice, settings,
           ))}
         </div>
 
-        <div className="th2-row th2-sub"><span>{L.nentotali.toUpperCase()}:</span><span>{m(invoice.nentotali ?? invoice.totali)} {sym}</span></div>
-        <div className="th2-total"><span>{L.totali.toUpperCase()}:</span><b>{m(invoice.totali)} {sym}</b></div>
+        {/* Shuma e faturës; me gjendje të mëparshme → Gjendja + Gjithsej; me pagesë të pjesshme → Paguar + Mbetja */}
+        <div className="th2-sums">
+          <div className={`th2-sum ${!gjPara && !partial ? 'final' : ''}`}><span>SHUMA:</span><b>{m(shuma)} {sym}</b></div>
+          {gjPara !== 0 && (
+            <>
+              <div className="th2-sum"><span>{gjPara < 0 ? 'TEPRICA:' : 'GJENDJA:'}</span><b>{gjPara < 0 ? '−' : ''}{m(Math.abs(gjPara))} {sym}</b></div>
+              <div className={`th2-sum ${!partial ? 'final' : 'strong'}`}><span>GJITHSEJ:</span><b>{m(gjithsej)} {sym}</b></div>
+            </>
+          )}
+          {partial && (
+            <>
+              <div className="th2-sum"><span>PAGUAR:</span><b>{m(paguar)} {sym}</b></div>
+              <div className="th2-sum final"><span>MBETJA:</span><b>{m(gjithsej - paguar)} {sym}</b></div>
+            </>
+          )}
+        </div>
 
         {!isDraft && !cancelled && (
           <div className={`th2-status ${paid ? 'paid' : ''}`}>STATUSI: {paid ? '✓ PAGUAR' : '× PA PAGUAR'}</div>
