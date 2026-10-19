@@ -15,7 +15,7 @@ import { useSettings } from '../../hooks/useSettings'
 import { STATUS_LABELS } from '../../services/invoiceChain'
 import { errorMessage } from '../../services/authService'
 import { formatMoney } from '../../utils/money'
-import { formatDate, formatDateTime, fromInputDate, periodLabel, periodRange, toInputDate } from '../../utils/date'
+import { formatDate, formatDateTime, fromInputDate, millis, periodLabel, periodRange, toInputDate } from '../../utils/date'
 import { StatusBadge, ACTION_LABELS, CancelModal } from './InvoiceViewPage'
 import Modal from '../../components/Modal'
 import InvoicePreview from '../../components/invoice/InvoicePreview'
@@ -56,6 +56,7 @@ export function InvoiceList({ fixedClientId, period: extPeriod, setPeriod: extSe
   const period = extPeriod ?? ownPeriod
   const setPeriod = extSetPeriod ?? setOwnPeriod
   const [statusi, setStatusi] = useState('')
+  const [city, setCity] = useState('')
   const [qText, setQText] = useState('')
   const [q, setQ] = useState('')
   const [pages, setPages] = useState([null])
@@ -70,9 +71,16 @@ export function InvoiceList({ fixedClientId, period: extPeriod, setPeriod: extSe
   const range = useMemo(() => periodRange(period), [period])
   const label = periodLabel(period)
   const target = useMemo(() => resolveSearch(q, fixedClientId ? [] : clients, items), [q, clients, items, fixedClientId])
+  const cities = useMemo(() => groupCities(clients), [clients])
   const baseFilters = useMemo(
-    () => ({ clientId: fixedClientId || undefined, statusi: statusi || undefined, from: range.from ?? undefined, to: range.to ?? undefined }),
-    [fixedClientId, statusi, range],
+    () => ({
+      clientId: fixedClientId || undefined,
+      statusi: statusi || undefined,
+      from: range.from ?? undefined,
+      to: range.to ?? undefined,
+      cityIds: !fixedClientId && city ? cities.find((c) => c.key === city)?.ids ?? [] : undefined,
+    }),
+    [fixedClientId, statusi, range, city, cities],
   )
 
   // Kërkimi aplikohet pasi ndalet shkrimi
@@ -148,6 +156,12 @@ export function InvoiceList({ fixedClientId, period: extPeriod, setPeriod: extSe
             <option value="">Të gjitha statuset</option>
             {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
+          {!fixedClientId && (
+            <select className="status-select" value={city} onChange={(e) => setCity(e.target.value)}>
+              <option value="">Të gjithë qytetet</option>
+              {cities.map((c) => <option key={c.key} value={c.key}>{c.label} ({c.ids.length})</option>)}
+            </select>
+          )}
           <button type="button" className="btn report-btn" onClick={() => setReport(true)}><BarChart3 size={16} /> Raport</button>
         </div>
         {target.type === 'clients' && <div className="small muted">Klientët: {target.names.join(', ')}{target.more ? ' …' : ''}</div>}
@@ -461,8 +475,49 @@ function resolveSearch(q, clients, items) {
   return { type: 'empty' }
 }
 
-/** Një faqe e listës sipas llojit të kërkimit. */
+/** Qytetet nga klientët, të bashkuara pavarësisht shkrimit (Krujë = KRUJË = Kruje). */
+const cityKey = (s) => (s ?? '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+function groupCities(clients) {
+  const map = new Map()
+  for (const c of clients) {
+    const key = cityKey(c.qyteti)
+    if (!key) continue
+    const g = map.get(key) ?? { key, ids: [], names: new Map() }
+    g.ids.push(c.id)
+    const n = c.qyteti.trim().toUpperCase()
+    g.names.set(n, (g.names.get(n) ?? 0) + 1)
+    map.set(key, g)
+  }
+  return [...map.values()]
+    .map((g) => ({ key: g.key, ids: g.ids, label: [...g.names.entries()].sort((a, b) => b[1] - a[1])[0][0] }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'sq'))
+}
+
+/**
+ * Faqja e faturave për një listë klientësh (mund të jenë > 30): një kërkesë "in" për çdo
+ * grup prej 30, të bashkuara sipas datës.
+ */
+async function fetchByClients(ids, filters, page) {
+  if (!ids.length) return { rows: [], more: false, cursor: null }
+  const { cityIds, ...f } = filters
+  const need = (page + 1) * PAGE + 1
+  const chunks = []
+  for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30))
+  const parts = await Promise.all(chunks.map((c) => queryInvoices({ ...f, clientIds: c, limit: need })))
+  const all = parts.flatMap((r) => r.rows).sort((a, b) => millis(b.data) - millis(a.data))
+  return { rows: all.slice(page * PAGE, (page + 1) * PAGE), more: all.length > (page + 1) * PAGE, cursor: null }
+}
+
+/** Një faqe e listës sipas llojit të kërkimit (dhe qytetit, nëse është zgjedhur). */
 async function fetchPage(target, filters, page, cursor) {
+  if (filters.cityIds) {
+    const inCity = new Set(filters.cityIds)
+    if (target.type === 'clients') return fetchByClients(target.ids.filter((id) => inCity.has(id)), filters, page)
+    if (target.type === 'none') return fetchByClients(filters.cityIds, filters, page)
+    const { cityIds, ...rest } = filters
+    const res = await fetchPage(target, rest, page, cursor)
+    return { ...res, rows: res.rows.filter((r) => inCity.has(r.clientId)) }
+  }
   if (target.type === 'empty') return { rows: [], more: false, cursor: null }
   if (target.type === 'numri') {
     const res = await queryInvoices({ numri: target.value })

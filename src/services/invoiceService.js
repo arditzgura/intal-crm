@@ -458,6 +458,11 @@ export async function queryInvoices(filters = {}, cursor = null) {
     if (filters.to) cons.push(where('data', '<=', filters.to))
     cons.push(orderBy('data', 'desc'))
   }
+  if (filters.limit) {
+    // N faturat e para të filtrit (për bashkimin e disa kërkesave "in", p.sh. filtri i qytetit).
+    const snap = await getDocs(query(col, ...cons, limit(filters.limit)))
+    return { rows: snap.docs.map((d) => ({ id: d.id, ...d.data() })), cursor: null, more: false }
+  }
   if (filters.all) {
     // Pa faqe (p.sh. për raportin): të gjitha faturat e filtrit, max 5000.
     const snap = await getDocs(query(col, ...cons, limit(5000)))
