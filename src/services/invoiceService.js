@@ -398,6 +398,107 @@ export async function cancelInvoice(id, arsye, actorName, { kthePagesen = false 
 }
 
 /**
+ * Pagesat e regjistruara te fatura (lëvizjet "pagese" të kartelës me faturaId = fatura),
+ * pa ato që janë anuluar tashmë, bashkë me lëvizjet e tyre në arkë/bankë.
+ */
+export async function paymentsOfInvoice(inv) {
+  const skip = new Set(inv.pagesatAnuluara ?? [])
+  const snap = await getDocs(query(companyCol('ledger'), where('faturaId', '==', inv.id)))
+  const payments = snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter((e) => e.tipi === 'pagese' && e.shuma < 0 && !skip.has(e.id))
+  const cash = []
+  for (const p of payments) {
+    const c = await getDocs(query(companyCol('cashMovements'), where('ledgerId', '==', p.id)))
+    for (const d of c.docs) cash.push({ id: d.id, ...d.data() })
+  }
+  return { payments, cash, total: payments.reduce((a, p) => a - p.shuma, 0) }
+}
+
+/**
+ * Heq shenjën "E paguar" nga fatura e fundit e klientit, kur u shënua gabimisht e paguar:
+ * njësoj sikur fatura të ruhej sërish pa pagesë. Në një transaction:
+ *  - kartela: lëvizje "anulim_pagese" (+ shuma e pagesave), borxhi rritet sërish;
+ *  - arka/banka: lëvizja e kundërt e çdo arkëtimi (pagesat e vjetra nuk fshihen);
+ *  - fatura: paguar = 0, gjendjaRe = gjendjaPara + totali, mbetur += shuma → "Pa paguar";
+ *    (lejohet vetëm te fatura e fundit: asnjë faturë tjetër nuk varet nga gjendja e saj);
+ *  - faturat "Pasuar" që u bënë "E paguar" me këtë pagesë kthehen "Pasuar";
+ *  - pikët e dhëna për to hiqen.
+ */
+export async function unmarkPaid(id, arsye, actorName) {
+  if (!arsye?.trim()) throw new Error('Shkruani arsyen.')
+  const pre = await getDoc(invoiceRef(id))
+  if (!pre.exists()) throw new Error('Fatura nuk ekziston.')
+  const found = await paymentsOfInvoice({ id, ...pre.data() })
+  if (!found.total) throw new Error('Kjo faturë nuk ka pagesa të regjistruara për t\'u hequr (mund të jetë mbyllur me tepricë të klientit).')
+
+  const entryRef = newDocRef('ledger')
+  await runTransaction(db, async (tx) => {
+    // --- leximet ---
+    const invSnap = await tx.get(invoiceRef(id))
+    const X = invSnap.data()
+    if (X.statusi !== 'e_paguar') throw new Error('Vetëm faturat "E paguar" mund të kthehen në "Pa paguar".')
+    const clientRef = companyDoc('clients', X.clientId)
+    const cSnap = await tx.get(clientRef)
+    const client = cSnap.data()
+    if (client.faturaFundit?.[X.monedha] !== id) throw new Error('Lejohet vetëm te fatura e fundit e klientit.')
+    if ((X.pagesatAnuluara ?? []).some((p) => found.payments.some((f) => f.id === p))) throw new Error('Pagesa është anuluar tashmë. Rifreskoni faqen.')
+    // Faturat para saj me borxh të bartur që u mbyllën nga kjo pagesë → "Pasuar"
+    const back = []
+    let pid = X.faturaPara
+    for (let i = 0; pid && i < 1000; i++) {
+      const s = await tx.get(invoiceRef(pid))
+      if (!s.exists()) break
+      const d = s.data()
+      if (d.statusi === 'anuluar') { pid = d.faturaPara; continue }
+      if (d.statusi !== 'e_paguar' || !(d.gjendjaRe > 0)) break
+      back.push({ id: pid, ref: s.ref, data: d })
+      pid = d.faturaPara
+    }
+
+    // --- shkrimet ---
+    const shuma = found.total
+    const para = client.gjendje?.[X.monedha] ?? 0
+    const shenim = `Anulim pagese – fatura #${X.numriTekst}`
+    tx.set(entryRef, ledgerEntryData({ clientId: X.clientId, tipi: 'anulim_pagese', monedha: X.monedha, kursi: X.kursi, shuma, data: new Date(), para, shenim, arsye: arsye.trim(), faturaId: id }, actorName))
+    for (const c of found.cash) {
+      writeCash(tx, { llogaria: c.llogaria, monedha: c.monedha, kursi: c.kursi, shuma: -c.shuma, tipi: 'anulim_pagese', data: new Date(), shenim: `${client.emri} – ${shenim}`, clientId: X.clientId, ledgerId: entryRef.id, invoiceId: id }, actorName)
+    }
+    const mbetur = X.mbetur + shuma
+    const gjendjaRe = X.gjendjaPara + X.totali
+    tx.update(invSnap.ref, {
+      statusi: mbetur > 0 ? 'pa_paguar' : 'e_paguar',
+      mbetur,
+      paguar: 0,
+      gjendjaRe,
+      piketDhene: 0,
+      pagesatAnuluara: [...(X.pagesatAnuluara ?? []), ...found.payments.map((p) => p.id)],
+    })
+    for (const b of back) tx.update(b.ref, { statusi: 'pasuar', piketDhene: 0 })
+
+    const pike = (X.piketDhene ?? 0) + back.reduce((a, b) => a + (b.data.piketDhene ?? 0), 0)
+    const pointsPatch = client.rastesor ? {} : writePointsEntry(
+      tx,
+      { clientId: X.clientId, client, pike: -pike, tipi: 'anulim_pagese', arsye: `Pagesa e faturës #${X.numriTekst} u anulua`, invoiceIds: [id, ...back.map((b) => b.id)] },
+      actorName,
+    )
+    tx.update(clientRef, { [`gjendje.${X.monedha}`]: para + shuma, lastLedgerIds: [entryRef.id], ...pointsPatch })
+    addAudit(tx, {
+      action: 'anulim_pagese',
+      entity: 'invoices',
+      entityId: id,
+      details: {
+        numri: X.numri, klienti: client.emri, monedha: X.monedha, shuma, arsye: arsye.trim(),
+        paguarPara: X.paguar, gjendjaRePara: X.gjendjaRe, gjendjaRe, pagesat: found.payments.map((p) => p.id),
+        pasuarSerish: back.map((b) => b.data.numri),
+      },
+      actorName,
+    })
+  })
+  return entryRef.id
+}
+
+/**
  * Korrigjim i një fature të lëshuar: fatura anulohet (pagesa mbetet si tepricë
  * e klientit, ndaj kalon vetë te fatura e re si gjendje e mëparshme) dhe krijohet
  * një draft i ri me të njëjtat të dhëna, që ndryshohet dhe lëshohet me numër të ri.

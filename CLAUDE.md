@@ -37,7 +37,7 @@ React + Vite, HashRouter, Firebase (vetëm Auth email/fjalëkalim + Firestore). 
 
 ## Struktura (Faza 3)
 - Fatura: `invoices` (draft pa numër → lëshim në një transaction te `services/invoiceService.js`). Numri unik: `invoiceNumbers/{numri}` + `counters/invoices`.
-- Zinxhiri: `clients.faturaFundit.{MONEDHA}` = fatura që mban borxhin; `invoices.mbetur` ndryshon me çdo lëvizje kartele; logjika e statuseve dhe pikëve te `services/invoiceChain.js` (përdoret nga lëshimi, pagesat dhe anulimi). Fushat e printuara (gjendjaPara/paguar/gjendjaRe) nuk ndryshojnë kurrë.
+- Zinxhiri: `clients.faturaFundit.{MONEDHA}` = fatura që mban borxhin; `invoices.mbetur` ndryshon me çdo lëvizje kartele; logjika e statuseve dhe pikëve te `services/invoiceChain.js` (përdoret nga lëshimi, pagesat dhe anulimi). Fushat e printuara (gjendjaPara/paguar/gjendjaRe) nuk ndryshojnë kurrë. Përjashtim i vetëm: `unmarkPaid` (heqja e shenjës "E paguar" te fatura e FUNDIT e klientit) vendos paguar = 0 dhe gjendjaRe = gjendjaPara + totali, me lëvizjen `anulim_pagese` në kartelë/arkë (pagesat e vjetra nuk fshihen; ruhen te `pagesatAnuluara`).
 - Klienti mund të marrë 1–3 lëvizje kartele në një transaction (`lastLedgerIds`); rules verifikojnë shumën.
 - `invoiceLines` (statistikat e klientit/artikullit), `stockMovements` (dalje/kthim_anulim), `costHistory` (fitimi me koston në datën e faturës).
 

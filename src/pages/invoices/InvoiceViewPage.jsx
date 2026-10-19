@@ -170,6 +170,7 @@ export const ACTION_LABELS = {
   fshirje_drafti: 'Fshiu draftin',
   leshim_fature: 'Lëshoi faturën',
   anulim_fature: 'Anuloi faturën',
+  anulim_pagese: 'E ktheu "Pa paguar" (hoqi pagesën)',
 }
 
 export function CancelModal({ inv, actorName, onClose }) {

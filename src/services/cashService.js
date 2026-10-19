@@ -13,7 +13,8 @@ import { millis } from '../utils/date'
  * hyrje/dalje parash, në të njëjtin transaction me veprimin burim:
  *   arketim (+, pagesë klienti) · kthim_klientit (−, anulim fature) ·
  *   pagese_furnitori (−) · shpenzim (−) · anulim (± kthen një shpenzim/pagesë) ·
- *   transferte (− nga njëra llogari, + te tjetra) · gjendje_fillestare / rregullim (±).
+ *   transferte (− nga njëra llogari, + te tjetra) · gjendje_fillestare / rregullim (±) ·
+ *   anulim_pagese (−, kthen arkëtimin e një fature të shënuar gabim si të paguar).
  * `cashBalances/main.{arke|banke}.{MONEDHA}` është kopje për shpejtësi (increment);
  * Admini e rindërton me "Rillogarit arkën".
  */
@@ -29,6 +30,7 @@ export const CASH_TYPES = {
   transferte: 'Transfertë',
   gjendje_fillestare: 'Gjendje fillestare',
   rregullim: 'Rregullim',
+  anulim_pagese: 'Anulim pagese (pagesë e shënuar gabim)',
 }
 
 const balancesRef = () => companyDoc('cashBalances', 'main')

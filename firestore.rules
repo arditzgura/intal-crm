@@ -133,6 +133,10 @@ service cloud.firestore {
           || (d.tipi == 'anulim' && can(companyId, 'anulim_fature')
             && invoiceAfter(companyId, d.faturaId).statusi == 'anuluar'
             && invoiceAfter(companyId, d.faturaId).clientId == d.clientId)
+          || (d.tipi == 'anulim_pagese' && d.shuma > 0 && can(companyId, 'pagese')
+            && d.arsye is string && d.arsye.size() > 0
+            && invoiceAfter(companyId, d.faturaId).clientId == d.clientId
+            && invoiceAfter(companyId, d.faturaId).paguar == 0)
         );
     }
 
@@ -161,6 +165,7 @@ service cloud.firestore {
             && d.arsye is string && d.arsye.size() > 0)
           || (d.tipi == 'fituar' && d.pike > 0 && d.invoiceIds is list)
           || (d.tipi == 'anulim_fature' && d.pike < 0 && can(companyId, 'anulim_fature'))
+          || (d.tipi == 'anulim_pagese' && d.pike < 0 && can(companyId, 'pagese'))
         );
     }
 
@@ -223,6 +228,9 @@ service cloud.firestore {
             && !exists(companyPath(companyId, 'ledger', d.ledgerId))
             && ledgerEntry(companyId, d.ledgerId).tipi == 'pagese'
             && ledgerEntry(companyId, d.ledgerId).shuma == -d.shuma)
+          || (d.tipi == 'anulim_pagese' && d.shuma < 0 && can(companyId, 'pagese')
+            && !exists(companyPath(companyId, 'ledger', d.ledgerId))
+            && ledgerEntry(companyId, d.ledgerId).tipi == 'anulim_pagese')
           || (d.tipi == 'kthim_klientit' && d.shuma < 0 && can(companyId, 'anulim_fature')
             && invoiceAfter(companyId, d.invoiceId).statusi == 'anuluar'
             && !exists(companyPath(companyId, 'ledger', d.ledgerId))
@@ -458,6 +466,13 @@ service cloud.firestore {
             resource.data.statusi in ['pa_paguar', 'pasuar', 'e_paguar'] && isMember(companyId)
             && changedKeys().hasOnly(['statusi', 'mbetur', 'faturaPas', 'piketDhene'])
             && request.resource.data.statusi in ['pa_paguar', 'pasuar', 'e_paguar']
+          ) || (
+            // Heqja e shenjës "E paguar" (vetëm fatura e fundit, me lëvizjen anulim_pagese në të njëjtin transaction)
+            resource.data.statusi == 'e_paguar' && can(companyId, 'pagese')
+            && changedKeys().hasOnly(['statusi', 'mbetur', 'paguar', 'gjendjaRe', 'piketDhene', 'pagesatAnuluara'])
+            && request.resource.data.statusi in ['pa_paguar', 'e_paguar']
+            && request.resource.data.paguar == 0
+            && request.resource.data.gjendjaRe == resource.data.gjendjaPara + resource.data.totali
           ) || (
             resource.data.statusi in ['pa_paguar', 'pasuar', 'e_paguar'] && can(companyId, 'anulim_fature')
             && request.resource.data.statusi == 'anuluar'

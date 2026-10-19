@@ -4,7 +4,7 @@ import { Search, X, Eye, Pencil, Trash2, MapPin, BarChart3, Calculator, Download
 import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
 import { watchClients } from '../../services/clientService'
-import { queryInvoices, queryAuditLog, deleteDraft, correctInvoice, invoiceIdsForItems, invoicesByIds, invoiceSummary, invoiceProfit, PAGE } from '../../services/invoiceService'
+import { queryInvoices, queryAuditLog, deleteDraft, correctInvoice, invoiceIdsForItems, invoicesByIds, invoiceSummary, invoiceProfit, paymentsOfInvoice, unmarkPaid, PAGE } from '../../services/invoiceService'
 import { watchItems, watchItemCosts } from '../../services/itemService'
 import { canSeeCost } from '../../config/roles'
 import { matchesSearch } from '../../utils/text'
@@ -214,7 +214,7 @@ export function InvoiceList({ fixedClientId, period: extPeriod, setPeriod: extSe
                     <td className="num pos">{isDraft ? '' : formatMoney(r.paguar, r.monedha)}</td>
                     <td className="num"><Debt r={r} /></td>
                     <td className="check-col" onClick={(e) => e.stopPropagation()}>
-                      <PaidCheckbox r={r} canPay={perms.has('pagese')} onPay={() => setModal({ type: 'paguaj', inv: r })} />
+                      <PaidCheckbox r={r} canPay={perms.has('pagese')} onPay={() => setModal({ type: 'paguaj', inv: r })} onUnpay={() => setModal({ type: 'zhpaguaj', inv: r })} />
                     </td>
                     <td><StatusBadge statusi={r.statusi} /></td>
                     <td className="num actions-cell" onClick={(e) => e.stopPropagation()}>
@@ -249,6 +249,9 @@ export function InvoiceList({ fixedClientId, period: extPeriod, setPeriod: extSe
         )}
         {modal?.type === 'paguaj' && (
           <PayInvoiceModal inv={modal.inv} actorName={profile?.emri} onClose={() => { setModal(null); reload() }} />
+        )}
+        {modal?.type === 'zhpaguaj' && (
+          <UnpayInvoiceModal inv={modal.inv} actorName={profile?.emri} onClose={() => { setModal(null); reload() }} />
         )}
         {modal?.type === 'korrigjo' && (
           <CorrectModal inv={modal.inv} actorName={profile?.emri} onClose={() => setModal(null)} onDone={(draftId) => navigate(`/fature-e-re?draft=${draftId}`)} />
@@ -389,9 +392,21 @@ function CorrectModal({ inv, actorName, onClose, onDone }) {
  * Checkbox "e paguar": bosh te "Pa paguar" (klikimi regjistron pagesën e borxhit
  * të mbetur), i shënuar te "E paguar". Te "Pasuar" borxhi ndodhet te fatura më e re.
  */
-function PaidCheckbox({ r, canPay, onPay }) {
+function PaidCheckbox({ r, canPay, onPay, onUnpay }) {
   if (r.statusi === 'draft' || r.statusi === 'anuluar') return null
-  if (r.statusi === 'e_paguar') return <input type="checkbox" checked readOnly disabled title="E paguar" />
+  if (r.statusi === 'e_paguar') {
+    // Vetëm fatura e fundit e klientit (pa faturë më të re pas saj) mund të kthehet "Pa paguar".
+    const latest = !r.faturaPas
+    return (
+      <input
+        type="checkbox"
+        checked
+        disabled={!canPay || !latest}
+        title={!latest ? 'E paguar. Vetëm fatura e fundit e klientit mund të kthehet "Pa paguar".' : canPay ? 'E paguar – hiqe shenjën nëse u shënua gabimisht e paguar' : 'E paguar'}
+        onChange={onUnpay}
+      />
+    )
+  }
   if (r.statusi === 'pasuar') return <input type="checkbox" checked={false} readOnly disabled title="Borxhi u bart te fatura më e re e klientit – paguhet atje" />
   return (
     <input
@@ -401,6 +416,72 @@ function PaidCheckbox({ r, canPay, onPay }) {
       title={canPay ? 'Shëno si të paguar (regjistron pagesën e borxhit të mbetur)' : 'Nuk keni leje për të regjistruar pagesë'}
       onChange={onPay}
     />
+  )
+}
+
+/** Heq shenjën "E paguar" nga fatura e fundit e klientit (u shënua gabimisht e paguar). */
+function UnpayInvoiceModal({ inv, actorName, onClose }) {
+  const [found, setFound] = useState(null)
+  const [arsye, setArsye] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    paymentsOfInvoice(inv).then(setFound).catch((err) => setError(errorMessage(err)))
+  }, [inv])
+
+  async function onSubmit(e) {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      await unmarkPaid(inv.id, arsye, actorName)
+      onClose()
+    } catch (err) {
+      setError(err.code ? errorMessage(err) : err.message)
+      setBusy(false)
+    }
+  }
+
+  const cash = found ? found.cash.reduce((m, c) => ({ ...m, [c.llogaria]: (m[c.llogaria] ?? 0) + c.shuma }), {}) : {}
+  return (
+    <Modal title={`Ktheje "Pa paguar" – fatura #${inv.numriTekst}`} onClose={onClose}>
+      <form onSubmit={onSubmit}>
+        {!found && !error && <p className="muted">Duke kërkuar pagesat e faturës…</p>}
+        {found && !found.total && (
+          <p className="alert error">Kjo faturë nuk ka pagesa të regjistruara për t'u hequr (mund të jetë mbyllur me tepricë të klientit).</p>
+        )}
+        {found && found.total > 0 && (
+          <>
+            <p>
+              Fatura e <b>{inv.klient?.emri}</b> ruhet sërish si e papaguar: hiqet pagesa prej{' '}
+              <b className="neg">{formatMoney(found.total, inv.monedha)}</b>, borxhi i klientit rritet me këtë shumë dhe
+              fatura kalon në <b>Pa paguar</b>.
+            </p>
+            <ul className="small">
+              {found.payments.map((p) => (
+                <li key={p.id}>{formatDate(p.data)} – {formatMoney(-p.shuma, p.monedha)}{p.shenim ? ` (${p.shenim})` : ''}</li>
+              ))}
+            </ul>
+            {Object.keys(cash).length > 0 && (
+              <p className="small muted">
+                Paratë dalin nga: {Object.entries(cash).map(([k, v]) => `${PAYMENT_METHODS[k] ?? k} ${formatMoney(v, inv.monedha)}`).join(' · ')}.
+                Pagesa e gabuar nuk fshihet; shtohet lëvizja e kundërt.
+              </p>
+            )}
+            <label className="field">
+              <span>Arsyeja *</span>
+              <textarea rows={2} value={arsye} onChange={(e) => setArsye(e.target.value)} placeholder="p.sh. U shënua e paguar gabimisht" required />
+            </label>
+          </>
+        )}
+        {error && <div className="alert error">{error}</div>}
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={onClose}>Mbyll</button>
+          <button type="submit" className="btn danger" disabled={busy || !found?.total || !arsye.trim()}>{busy ? 'Duke ruajtur…' : 'Ktheje "Pa paguar"'}</button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
