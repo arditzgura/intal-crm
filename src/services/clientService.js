@@ -1,4 +1,4 @@
-import { onSnapshot, runTransaction, serverTimestamp, writeBatch, getDoc } from 'firebase/firestore'
+import { documentId, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, where, writeBatch } from 'firebase/firestore'
 import { db } from '../firebase'
 import { companyCol, companyDoc, newDocRef } from './paths'
 import { addAudit } from './auditService'
@@ -109,4 +109,15 @@ export async function ensureWalkInClient(actorName) {
   })
   addAudit(batch, { action: 'krijim_klienti', entity: 'clients', entityId: WALK_IN_ID, details: { emri: 'Klient Rastësor' }, actorName })
   await batch.commit()
+}
+
+/** Lexon vetëm klientët e dhënë (me grupe nga 30): { id: { emri, qyteti, kodi } }. */
+export async function clientsByIds(ids) {
+  const out = {}
+  const list = [...new Set(ids)].filter(Boolean)
+  for (let i = 0; i < list.length; i += 30) {
+    const snap = await getDocs(query(companyCol('clients'), where(documentId(), 'in', list.slice(i, i + 30))))
+    for (const d of snap.docs) out[d.id] = { emri: d.data().emri, qyteti: d.data().qyteti ?? '', kodi: d.data().kodi ?? '' }
+  }
+  return out
 }

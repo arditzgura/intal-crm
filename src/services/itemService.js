@@ -191,6 +191,18 @@ export function watchCostHistory(onData, onError) {
   )
 }
 
+/** Historiku i kostos së një artikulli: { itemId: [{ kosto, nga }] } (formati i costAt). */
+export function watchItemCostHistory(itemId, onData, onError) {
+  return onSnapshot(
+    query(companyCol('costHistory'), where('itemId', '==', itemId)),
+    (snap) => {
+      const list = snap.docs.map((d) => ({ kosto: d.data().kosto, nga: d.data().nga?.toMillis?.() ?? 0 })).sort((a, b) => a.nga - b.nga)
+      onData({ [itemId]: list })
+    },
+    onError,
+  )
+}
+
 /** Kosto e artikullit në një datë: hyrja e fundit para datës, përndryshe e para e njohur ose kosto aktuale. */
 export function costAt(itemId, dateMs, history, currentCosts) {
   const list = history[itemId]

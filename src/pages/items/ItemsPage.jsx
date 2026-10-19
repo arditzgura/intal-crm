@@ -82,6 +82,7 @@ export default function ItemsPage() {
     emri: (i) => i.emri,
     cmimi: (i) => i.cmimi,
     stoku: (i) => stock[i.id] ?? 0,
+    sasia: (i) => sales?.[i.id]?.sasia ?? null,
     shitjet: (i) => sales?.[i.id]?.totali ?? null,
     fitimi: (i) => profitOf(i),
   }, { key: 'emri', dir: 'asc' })
@@ -138,9 +139,10 @@ export default function ItemsPage() {
             <thead>
               <tr>
                 <SortTh s={s} k="emri">Artikulli</SortTh>
-                <SortTh s={s} k="cmimi" className="num">Çmimi standard</SortTh>
+                <SortTh s={s} k="cmimi" className="num">Çmimi</SortTh>
                 <SortTh s={s} k="stoku" className="num">Gjendja (stoku)</SortTh>
-                <SortTh s={s} k="shitjet" className="num">Shitjet (totali)</SortTh>
+                <SortTh s={s} k="sasia" className="num">Shitjet (totale)</SortTh>
+                <SortTh s={s} k="shitjet" className="num">Vlera e shitjeve</SortTh>
                 {showCost && (
                   <SortTh s={s} k="fitimi" className="num" title="Shitjet në LEK − sasia × kosto aktuale">
                     <span className="th-stack">Fitimi{totalProfit != null && <b className={totalProfit < 0 ? 'neg' : 'pos'}>{totalProfit >= 0 ? '+' : ''}{formatMoney(totalProfit, 'LEK')}</b>}</span>
@@ -150,8 +152,8 @@ export default function ItemsPage() {
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={6} className="muted">Duke u ngarkuar…</td></tr>}
-              {!loading && !paged.rows.length && <tr><td colSpan={6} className="muted">Asnjë artikull.</td></tr>}
+              {loading && <tr><td colSpan={7} className="muted">Duke u ngarkuar…</td></tr>}
+              {!loading && !paged.rows.length && <tr><td colSpan={7} className="muted">Asnjë artikull.</td></tr>}
               {paged.rows.map((i) => {
                 const q = stock[i.id] ?? 0
                 const low = q < 0 || (i.stokMinimal > 0 && q < i.stokMinimal)
@@ -170,12 +172,10 @@ export default function ItemsPage() {
                       {low && <AlertTriangle size={13} className="warn-icon" />}
                     </td>
                     <td className="num">
-                      {sales == null ? <span className="muted">…</span> : (
-                        <>
-                          <b>{formatMoney(sale?.totali ?? 0)}</b> <span className="muted small">L</span>
-                          {sale?.sasia ? <div className="small muted">{sale.sasia} {i.njesia}</div> : null}
-                        </>
-                      )}
+                      {sales == null ? <span className="muted">…</span> : <><b>{sale?.sasia ?? 0}</b> <span className="muted small">{i.njesia}</span></>}
+                    </td>
+                    <td className="num">
+                      {sales == null ? <span className="muted">…</span> : <><b>{formatMoney(sale?.totali ?? 0)}</b> <span className="muted small">L</span></>}
                     </td>
                     {showCost && (
                       <td className={`num ${profit < 0 ? 'neg' : 'pos'}`}>
