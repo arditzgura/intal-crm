@@ -958,4 +958,10 @@ th.sortable.sorted .sort-icon { opacity: 1; }
 .ni-tab-x:hover { background: #e2e8f0; color: #0f172a; }
 .ni-tab-add { border: 0; background: transparent; color: #64748b; border-radius: 8px; padding: 6px 8px; margin-bottom: 3px; cursor: pointer; display: grid; place-items: center; }
 .ni-tab-add:hover { background: #e2e8f0; color: #0f172a; }
-.ni-tabs + div > div > .ni-card, .ni-tabs ~ div .ni-card { border-top-left-radius: 0; }
+
+/* Skedat brenda fletës së bardhë (aty ku sfondi gri bëhet i bardhë) */
+.ni-sheet { background: #fff; border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+.ni-sheet .ni-tabs { margin: 0; padding: 10px 16px 0; border-bottom: 1px solid var(--border); z-index: auto; }
+.ni-sheet .ni-tab { margin-bottom: -1px; background: #f1f5f9; }
+.ni-sheet .ni-tab.active { background: #fff; border-bottom: 1px solid #fff; }
+.ni-sheet .ni-card { border: 0; box-shadow: none; background: transparent; border-radius: 0 0 16px 16px; margin: 0; }

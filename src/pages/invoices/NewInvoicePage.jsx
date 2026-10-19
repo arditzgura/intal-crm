@@ -81,6 +81,7 @@ export default function NewInvoicePage() {
 
   return (
     <div>
+      <div className={editing ? '' : 'ni-sheet'}>
       {!editing && (
         <div className="ni-tabs" role="tablist">
           {tabs.map((t) => (
@@ -108,6 +109,7 @@ export default function NewInvoicePage() {
           )}
         </div>
       ))}
+      </div>
       {issued && <InvoicePreview invoice={issued} onClose={() => setIssued(null)} />}
     </div>
   )
