@@ -12,12 +12,16 @@ import { useSort, SortTh } from '../../hooks/useSort'
 import Balance from '../../components/Balance'
 import ClientFormModal from './ClientFormModal'
 
+/** Klienti ka borxh (gjendje > 0) në të paktën një monedhë. */
+const hasDebt = (c) => Object.values(c.gjendje ?? {}).some((v) => v > 0)
+
 export default function ClientsPage() {
   const { perms, profile } = useAuth()
   const navigate = useNavigate()
   const { data: clients, loading, error } = useLive(watchClients, [], { initial: [] })
   const [q, setQ] = useState('')
   const [tipi, setTipi] = useState('')
+  const [statusi, setStatusi] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [creating, setCreating] = useState(false)
   const editable = canEditClients(perms)
@@ -31,8 +35,9 @@ export default function ClientsPage() {
       clients
         .filter((c) => (showArchived ? true : !c.arkivuar))
         .filter((c) => !tipi || c.tipi === tipi || (c.tipi === 'te_dyja' && tipi !== ''))
+        .filter((c) => !statusi || (statusi === 'pa_paguar') === hasDebt(c))
         .filter((c) => matchesSearch(q, c.emri, c.kodi, c.qyteti, c.telefoni, c.nipt)),
-    [clients, q, tipi, showArchived],
+    [clients, q, tipi, statusi, showArchived],
   )
   const s = useSort(filtered, {
     kodi: (c) => c.kodi,
@@ -69,6 +74,11 @@ export default function ClientsPage() {
           {Object.entries(CLIENT_TYPES).map(([k, v]) => (
             <option key={k} value={k}>{v}</option>
           ))}
+        </select>
+        <select className="status-select" value={statusi} onChange={(e) => setStatusi(e.target.value)} title="E paguar = pa borxh · Pa paguar = me borxh në një nga monedhat">
+          <option value="">Të gjitha statuset</option>
+          <option value="e_paguar">E paguar</option>
+          <option value="pa_paguar">Pa paguar</option>
         </select>
         <label className="check">
           <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> Të arkivuarit
