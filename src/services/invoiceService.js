@@ -426,7 +426,7 @@ export async function paymentsOfInvoice(inv) {
  *  - pikët e dhëna për to hiqen.
  */
 export async function unmarkPaid(id, arsye, actorName) {
-  if (!arsye?.trim()) throw new Error('Shkruani arsyen.')
+  arsye = arsye?.trim() || 'U shënua gabimisht e paguar'
   const pre = await getDoc(invoiceRef(id))
   if (!pre.exists()) throw new Error('Fatura nuk ekziston.')
   const found = await paymentsOfInvoice({ id, ...pre.data() })

@@ -4,7 +4,7 @@ import { Search, X, Eye, Pencil, Trash2, MapPin, BarChart3, Calculator, Download
 import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
 import { watchClients } from '../../services/clientService'
-import { queryInvoices, queryAuditLog, deleteDraft, correctInvoice, invoiceIdsForItems, invoicesByIds, invoiceSummary, invoiceProfit, paymentsOfInvoice, unmarkPaid, PAGE } from '../../services/invoiceService'
+import { queryInvoices, queryAuditLog, deleteDraft, invoiceIdsForItems, invoicesByIds, invoiceSummary, invoiceProfit, paymentsOfInvoice, unmarkPaid, PAGE } from '../../services/invoiceService'
 import { watchItems, watchItemCosts } from '../../services/itemService'
 import { canSeeCost } from '../../config/roles'
 import { matchesSearch } from '../../utils/text'
@@ -223,7 +223,7 @@ export function InvoiceList({ fixedClientId, period: extPeriod, setPeriod: extSe
                         <button className="icon-btn" title="Ndrysho draftin" onClick={open}><Pencil size={17} /></button>
                       )}
                       {!isDraft && r.statusi !== 'anuluar' && perms.has('anulim_fature') && perms.has('fature_leshim') && (
-                        <button className="icon-btn" title="Korrigjo (anulo dhe krijo draft të ri)" onClick={() => setModal({ type: 'korrigjo', inv: r })}><Pencil size={17} /></button>
+                        <button className="icon-btn" title="Ndrysho faturën (hapet te Fatura e Re)" onClick={() => navigate(`/fature-e-re?korrigjo=${r.id}`)}><Pencil size={17} /></button>
                       )}
                       {isDraft && perms.has('fature_leshim') && (
                         <button className="icon-btn danger-text" title="Fshi draftin" onClick={() => onDeleteDraft(r)}><Trash2 size={17} /></button>
@@ -252,9 +252,6 @@ export function InvoiceList({ fixedClientId, period: extPeriod, setPeriod: extSe
         )}
         {modal?.type === 'zhpaguaj' && (
           <UnpayInvoiceModal inv={modal.inv} actorName={profile?.emri} onClose={() => { setModal(null); reload() }} />
-        )}
-        {modal?.type === 'korrigjo' && (
-          <CorrectModal inv={modal.inv} actorName={profile?.emri} onClose={() => setModal(null)} onDone={(draftId) => navigate(`/fature-e-re?draft=${draftId}`)} />
         )}
         <div className="pager">
           <button className="btn small" disabled={page === 0 || loading} onClick={() => setPage(page - 1)}>‹ Para</button>
@@ -346,48 +343,6 @@ function Debt({ r }) {
   )
 }
 
-/** Korrigjim: anulon faturën dhe hap një draft të ri me të njëjtat të dhëna. */
-function CorrectModal({ inv, actorName, onClose, onDone }) {
-  const [arsye, setArsye] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-
-  async function onSubmit(e) {
-    e.preventDefault()
-    setBusy(true)
-    setError('')
-    try {
-      const draftId = await correctInvoice(inv.id, arsye, actorName)
-      onDone(draftId)
-    } catch (err) {
-      setError(err.code ? errorMessage(err) : err.message)
-      setBusy(false)
-    }
-  }
-
-  return (
-    <Modal title={`Korrigjo faturën Nr. ${inv.numriTekst}`} onClose={onClose}>
-      <form onSubmit={onSubmit}>
-        <p>Një faturë e lëshuar nuk ndryshohet. Korrigjimi bëhet kështu:</p>
-        <ol className="steps">
-          <li>Fatura <b>#{inv.numriTekst}</b> anulohet (mbetet në histori si "Anuluar"); kartela dhe stoku kthehen mbrapsht.</li>
-          {inv.paguar > 0 && <li>Pagesa prej {formatMoney(inv.paguar, inv.monedha)} mbetet te klienti si tepricë dhe kalon vetë te fatura e re.</li>}
-          <li>Hapet një <b>draft i ri</b> me të njëjtat artikuj dhe çmime, që e ndryshoni dhe e lëshoni me numër të ri.</li>
-        </ol>
-        <label className="field">
-          <span>Arsyeja e korrigjimit *</span>
-          <textarea rows={2} value={arsye} onChange={(e) => setArsye(e.target.value)} placeholder="p.sh. sasi e gabuar te artikulli X" required autoFocus />
-        </label>
-        {error && <div className="alert error">{error}</div>}
-        <div className="modal-actions">
-          <button type="button" className="btn" onClick={onClose}>Mbyll</button>
-          <button className="btn primary" disabled={busy || !arsye.trim()}>{busy ? 'Duke korrigjuar…' : 'Anulo dhe hap draftin'}</button>
-        </div>
-      </form>
-    </Modal>
-  )
-}
-
 /**
  * Checkbox "e paguar": bosh te "Pa paguar" (klikimi regjistron pagesën e borxhit
  * të mbetur), i shënuar te "E paguar". Te "Pasuar" borxhi ndodhet te fatura më e re.
@@ -470,15 +425,15 @@ function UnpayInvoiceModal({ inv, actorName, onClose }) {
               </p>
             )}
             <label className="field">
-              <span>Arsyeja *</span>
-              <textarea rows={2} value={arsye} onChange={(e) => setArsye(e.target.value)} placeholder="p.sh. U shënua e paguar gabimisht" required />
+              <span>Arsyeja (opsionale)</span>
+              <textarea rows={2} value={arsye} onChange={(e) => setArsye(e.target.value)} placeholder="p.sh. U shënua e paguar gabimisht" />
             </label>
           </>
         )}
         {error && <div className="alert error">{error}</div>}
         <div className="modal-actions">
           <button type="button" className="btn" onClick={onClose}>Mbyll</button>
-          <button type="submit" className="btn danger" disabled={busy || !found?.total || !arsye.trim()}>{busy ? 'Duke ruajtur…' : 'Ktheje "Pa paguar"'}</button>
+          <button type="submit" className="btn danger" disabled={busy || !found?.total}>{busy ? 'Duke ruajtur…' : 'Ktheje "Pa paguar"'}</button>
         </div>
       </form>
     </Modal>

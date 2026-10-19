@@ -52,6 +52,7 @@ export const DEFAULT_SETTINGS = {
     fonti: 'Arial',
     madhesiaFontit: 12,
     gjeresiaTermike: 80, // mm
+    watermark: '', // imazhi i watermark-ut (base64), më vete nga logoja
     watermarkMadhesia: 50, // % e faqes
     watermarkTransparenca: 10, // %
   },

@@ -7,7 +7,7 @@ import { useLive } from '../../hooks/useLive'
 import { useSettings } from '../../hooks/useSettings'
 import { watchClients } from '../../services/clientService'
 import { watchItems, watchPricesForClient } from '../../services/itemService'
-import { saveDraft, deleteDraft, issueInvoice, watchDrafts, watchNextInvoiceNumber } from '../../services/invoiceService'
+import { saveDraft, deleteDraft, issueInvoice, cancelInvoice, watchDrafts, watchNextInvoiceNumber } from '../../services/invoiceService'
 import { formatDocNumber } from '../../services/settingsService'
 import { watchStock } from '../../services/stockService'
 import { companyDoc } from '../../services/paths'
@@ -37,6 +37,9 @@ export default function NewInvoicePage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const draftId = params.get('draft')
+  // Ndryshimi i një fature të lëshuar: hapet këtu; ruajtja e anulon dhe lëshon të renë.
+  const korrigjoId = draftId ? null : params.get('korrigjo')
+  const [orig, setOrig] = useState(null)
 
   const { data: clients } = useLive(watchClients, [], { initial: [] })
   const { data: items } = useLive(watchItems, [], { initial: [] })
@@ -84,11 +87,18 @@ export default function NewInvoicePage() {
   const itemsById = useMemo(() => Object.fromEntries(items.map((i) => [i.id, i])), [items])
   const canManualBalance = canLedger(perms, 'rregullim')
 
-  // ---------- Ngarkimi i draftit ----------
+  // ---------- Ngarkimi i draftit (ose i faturës që ndryshohet) ----------
   useEffect(() => {
-    if (!draftId) return
-    getDoc(companyDoc('invoices', draftId)).then((snap) => {
-      if (!snap.exists() || snap.data().statusi !== 'draft') {
+    const loadId = draftId ?? korrigjoId
+    if (!loadId) { setOrig(null); return }
+    getDoc(companyDoc('invoices', loadId)).then((snap) => {
+      if (korrigjoId) {
+        if (!snap.exists() || !['pa_paguar', 'pasuar', 'e_paguar'].includes(snap.data().statusi)) {
+          setError('Fatura nuk u gjet ose është anuluar.')
+          return
+        }
+        setOrig({ id: snap.id, ...snap.data() })
+      } else if (!snap.exists() || snap.data().statusi !== 'draft') {
         setError('Drafti nuk u gjet ose është lëshuar tashmë.')
         return
       }
@@ -105,13 +115,13 @@ export default function NewInvoicePage() {
         emptyLine(),
       ])
       setShenime(d.shenime ?? '')
-      if (d.paguar) {
+      if (d.paguar && !korrigjoId) {
         setPaguarText(formatMoney(d.paguar))
         setPaguarTouched(true)
       }
       setMetoda(d.metodaPagese ?? 'arke')
     }).catch((err) => setError(errorMessage(err)))
-  }, [draftId])
+  }, [draftId, korrigjoId])
 
   // ---------- Klienti / monedha ----------
   function pickClient(id) {
@@ -191,10 +201,14 @@ export default function NewInvoicePage() {
   const totali = parsed.reduce((s, l) => s + l.totali, 0)
   const qtyByItem = {}
   for (const l of parsed) if (l.ok) qtyByItem[l.itemId] = (qtyByItem[l.itemId] ?? 0) + l.sasiaN
-  const overStock = (itemId) => (qtyByItem[itemId] ?? 0) > (stock[itemId] ?? 0)
+  const origQty = {}
+  for (const r of orig?.rreshtat ?? []) origQty[r.itemId] = (origQty[r.itemId] ?? 0) + r.sasia
+  const overStock = (itemId) => (qtyByItem[itemId] ?? 0) > (stock[itemId] ?? 0) + (origQty[itemId] ?? 0)
 
   // ---------- Gjendja / pagesa ----------
-  const gjAuto = client?.gjendje?.[monedha] ?? 0
+  // Gjatë ndryshimit: gjendja pa faturën e vjetër (anulimi ia heq totalin; pagesa e saj mbetet në kartelë).
+  const origShare = orig && orig.clientId === clientId && orig.monedha === monedha ? orig.totali : 0
+  const gjAuto = (client?.gjendje?.[monedha] ?? 0) - origShare
   const gjManual = gjParaText != null ? parseMoney(gjParaText) : null
   const gjendjaPara = gjManual ?? gjAuto
   const manualChanged = gjParaText != null && gjManual != null && gjManual !== gjAuto
@@ -266,10 +280,13 @@ export default function NewInvoicePage() {
       `Gjendja (+): ${formatMoney(gjendjaPara, monedha)}\n` +
       `Paguar (−): ${formatMoney(pay, monedha)} (${PAYMENT_METHODS[metoda]})\n` +
       `Detyrimi përfundimtar: ${formatMoney(after, monedha)}\n\n` +
-      'Pas lëshimit fatura nuk ndryshohet (korrigjohet me anulim).'
+      (orig
+        ? `Fatura #${orig.numriTekst} anulohet dhe zëvendësohet nga kjo faturë (me numër të ri).`
+        : 'Pas lëshimit fatura nuk ndryshohet (korrigjohet me anulim).')
     if (!window.confirm(msg)) return
     setBusy(true)
     try {
+      if (orig) await cancelInvoice(orig.id, 'Ndryshim fature – u zëvendësua nga fatura e re', profile?.emri, { kthePagesen: false })
       const { id } = await issueInvoice(draftId, payload(pay), profile?.emri)
       navigate(`/fatura/${id}`)
     } catch (err) {
@@ -319,6 +336,12 @@ export default function NewInvoicePage() {
         <div className="muted small">Sistemi i Menaxhimit për {settings.kompania.emri}</div>
       </div>
 
+      {orig && (
+        <div className="alert info ni-edit-banner">
+          Po ndryshoni faturën <b>#{orig.numriTekst}</b> të {orig.klient?.emri}. Ruajtja e anulon atë dhe lëshon faturën e
+          ndryshuar me numër të ri; pagesat e saj mbeten në kartelë. <Link to="/historiku">Anulo ndryshimin</Link>
+        </div>
+      )}
       <div className="card ni-card">
         {/* Koka: kompania · PASTRO · FATURË · monedha · numri */}
         <div className="ni-top">
@@ -470,7 +493,7 @@ export default function NewInvoicePage() {
                 <button type="button" className="ni-btn green" onClick={() => onIssue(true)} disabled={busy}><CheckCheck size={18} /> Ruaj si të paguar</button>
               </>
             )}
-            <button type="button" className="btn link ni-draft-link" onClick={onSaveDraft} disabled={busy}><Save size={14} /> Ruaj si draft (pa numër)</button>
+            {!orig && <button type="button" className="btn link ni-draft-link" onClick={onSaveDraft} disabled={busy}><Save size={14} /> Ruaj si draft (pa numër)</button>}
           </div>
         </div>
       </div>

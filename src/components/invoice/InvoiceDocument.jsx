@@ -25,70 +25,63 @@ const InvoiceDocument = forwardRef(function InvoiceDocument({ invoice, settings,
   }
 
   if (format === 'termik') {
+    const sym = cur === 'LEK' ? 'L' : cur === 'EUR' ? '€' : '$'
+    const paid = invoice.statusi === 'e_paguar'
+    const city = k1.qyteti ? ` (${k1.qyteti})` : ''
     return (
-      <div ref={ref} className="inv inv-thermal" style={{ width: `${f.gjeresiaTermike}mm` }}>
-        {k.logo && <img src={k.logo} alt="" className="inv-th-logo" />}
-        <div className="inv-th-center">
-          <b className="inv-th-company">{k.emri}</b>
-          {k.nipt && <div>NIPT: {k.nipt}</div>}
+      <div ref={ref} className="inv inv-thermal th2" style={{ width: `${f.gjeresiaTermike}mm` }}>
+        <div className="th2-head">
+          <div className="th2-company">{k.emri}</div>
           {k.adresa && <div>{k.adresa}</div>}
           {k.telefoni && <div>Tel: {k.telefoni}</div>}
+          {k.website && <div className="th2-web">{k.website}</div>}
+          {k.nipt && <div>NIPT: {k.nipt}</div>}
         </div>
-        <div className="inv-th-sep" />
-        <div className="inv-th-center">
-          <b>{L.fatura} Nr. {numri}</b>
-          <div>{formatDate(invoice.data)}</div>
-          {cancelled && <b>*** ANULUAR ***</b>}
+        <div className="th2-rule" />
+        <div className="th2-row"><span>{L.fatura.toUpperCase()} NR:</span><b>#{numri}</b></div>
+        <div className="th2-row"><span>DATA:</span><span>{formatDate(invoice.data).replaceAll('.', '/')}</span></div>
+        {cancelled && <div className="th2-cancel">*** ANULUAR ***</div>}
+
+        <div className="th2-boxes">
+          <div className="th2-box th2-client">
+            <small>{L.klienti.toUpperCase()}</small>
+            <b>{k1.emri}{city}</b>
+          </div>
+          {invoice.piketKlientit != null && (
+            <div className="th2-box th2-points">
+              <small>PIKËT</small>
+              <b>{invoice.piketKlientit}</b>
+            </div>
+          )}
         </div>
-        <div className="inv-th-sep" />
-        <div>{L.klienti}: <b>{k1.emri}</b></div>
-        {k1.qyteti && <div>{k1.qyteti}</div>}
-        <div className="inv-th-sep" />
-        <table className="inv-th-items" style={itemStyle}>
-          <tbody>
-            {invoice.rreshtat.map((r, i) => (
-              <tr key={i}>
-                <td>
-                  <div>{r.emri}</div>
-                  <div className="inv-th-sub">{r.sasia} {r.njesia} × {m(r.cmimi)}</div>
-                </td>
-                <td className="num">{m(r.totali)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="inv-th-sep" />
-        <ThermalRow label={L.totali} value={`${m(invoice.totali)} ${cur}`} bold />
-        {!isDraft && (
-          <>
-            <ThermalRow label={L.gjendja} value={m(invoice.gjendjaPara)} />
-            <ThermalRow label={L.paguar} value={m(invoice.paguar)} />
-            <ThermalRow label={gjendjaRe < 0 ? L.teprica : L.detyrimi} value={`${m(Math.abs(gjendjaRe))} ${cur}`} bold />
-          </>
+
+        <div className="th2-items" style={itemStyle}>
+          {invoice.rreshtat.map((r, i) => (
+            <div key={i} className="th2-item">
+              <b className="th2-item-name">{r.emri}</b>
+              <div className="th2-row"><span>{r.sasia} × {m(r.cmimi)}</span><b>{m(r.totali)} {sym}</b></div>
+            </div>
+          ))}
+        </div>
+
+        <div className="th2-row th2-sub"><span>{L.nentotali.toUpperCase()}:</span><span>{m(invoice.nentotali ?? invoice.totali)} {sym}</span></div>
+        <div className="th2-total"><span>{L.totali.toUpperCase()}:</span><b>{m(invoice.totali)} {sym}</b></div>
+
+        {!isDraft && !cancelled && (
+          <div className={`th2-status ${paid ? 'paid' : ''}`}>STATUSI: {paid ? '✓ PAGUAR' : '× PA PAGUAR'}</div>
         )}
+
         {invoice.shenime && (
-          <>
-            <div className="inv-th-sep" />
-            <div className="inv-notes">{invoice.shenime}</div>
-          </>
+          <div className="th2-notes"><b>SHËNIME:</b> <i>{invoice.shenime}</i></div>
         )}
-        <div className="inv-th-sep" />
-        <div className="inv-th-center">{L.falenderim}</div>
-        {k.slogani && <div className="inv-th-center inv-th-sub">{k.slogani}</div>}
+        <div className="th2-thanks">{(L.falenderim || 'Faleminderit! Ju mirëpresim përsëri!').toUpperCase()}</div>
       </div>
     )
   }
 
   return (
     <div ref={ref} className={`inv inv-a4 tpl-${f.shablloni}`}>
-      {k.logo && f.watermarkMadhesia > 0 && (
-        <img
-          src={k.logo}
-          alt=""
-          className="inv-watermark"
-          style={{ width: `${f.watermarkMadhesia}%`, opacity: f.watermarkTransparenca / 100 }}
-        />
-      )}
+      <Watermark f={f} />
       {cancelled && <div className="inv-stamp">ANULUAR</div>}
       {isDraft && <div className="inv-stamp draft">DRAFT</div>}
 
@@ -121,9 +114,9 @@ const InvoiceDocument = forwardRef(function InvoiceDocument({ invoice, settings,
         <div className="inv-client-lines">
           {k1.kodi && <span>Kodi: {k1.kodi}</span>}
           {k1.nipt && <span>NIPT: {k1.nipt}</span>}
-          {k1.adresa && <span>{k1.adresa}</span>}
+          {k1.adresa && k1.adresa.trim().toUpperCase() !== (k1.qyteti ?? '').trim().toUpperCase() && <span>{k1.adresa}</span>}
           {k1.qyteti && <span>{k1.qyteti}</span>}
-          {k1.telefoni && <span>Tel: {k1.telefoni}</span>}
+          {phoneOf(k1) && <span>Tel: {phoneOf(k1)}</span>}
         </div>
       </section>
 
@@ -200,14 +193,14 @@ const InvoiceDocument = forwardRef(function InvoiceDocument({ invoice, settings,
   )
 })
 
-function ThermalRow({ label, value, bold }) {
-  return (
-    <div className={`inv-th-row ${bold ? 'bold' : ''}`}>
-      <span>{label}</span>
-      <span>{value}</span>
-    </div>
-  )
+/** Watermark-u: imazh më vete nga Cilësimet (logoja përdoret vetëm në krye). */
+function Watermark({ f }) {
+  if (!f.watermark || !(f.watermarkMadhesia > 0)) return null
+  return <img src={f.watermark} alt="" className="inv-watermark" style={{ width: `${f.watermarkMadhesia}%`, opacity: (f.watermarkTransparenca ?? 10) / 100 }} />
 }
+
+/** Telefoni i klientit vetëm kur është numër (në të dhënat e vjetra disa kanë qytetin aty). */
+const phoneOf = (k1) => (k1.telefoni && /\d/.test(k1.telefoni) ? k1.telefoni : '')
 
 /** Shablloni kryesor (si fatura e sistemit të vjetër INTAL). */
 const IntalA4 = forwardRef(function IntalA4({ invoice, settings }, ref) {
@@ -229,9 +222,7 @@ const IntalA4 = forwardRef(function IntalA4({ invoice, settings }, ref) {
 
   return (
     <div ref={ref} className="inv inv-a4 tpl-intal">
-      {k.logo && f.watermarkMadhesia > 0 && (
-        <img src={k.logo} alt="" className="inv-watermark" style={{ width: `${f.watermarkMadhesia}%`, opacity: f.watermarkTransparenca / 100 }} />
-      )}
+      <Watermark f={f} />
       {cancelled && <div className="inv-stamp">ANULUAR</div>}
       {isDraft && <div className="inv-stamp draft">DRAFT</div>}
 
@@ -261,7 +252,7 @@ const IntalA4 = forwardRef(function IntalA4({ invoice, settings }, ref) {
           <div className="ti-client-label">{L.klienti}:</div>
           <div className="ti-client-name">{k1.emri}</div>
           {k1.qyteti && <div className="ti-client-city">{k1.qyteti}</div>}
-          {k1.telefoni && <div className="ti-client-city">{k1.telefoni}</div>}
+          {phoneOf(k1) && <div className="ti-client-city">{phoneOf(k1)}</div>}
         </div>
         {!isDraft && (
           <div className="ti-pills">
