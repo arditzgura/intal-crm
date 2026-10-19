@@ -89,7 +89,7 @@ const InvoiceDocument = forwardRef(function InvoiceDocument({ invoice, settings,
         </div>
 
         {!isDraft && !cancelled && (
-          <div className={`th2-status ${paid ? 'paid' : ''}`}>STATUSI: {paid ? '✓ PAGUAR' : '× PA PAGUAR'}</div>
+          <div className={`th2-status ${paid ? 'paid' : ''}`}>{paid ? '✓ PAGUAR' : '× PA PAGUAR'}</div>
         )}
 
         {invoice.shenime && (
