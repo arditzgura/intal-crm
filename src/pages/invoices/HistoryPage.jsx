@@ -131,6 +131,9 @@ export function InvoiceList({ fixedClientId, period: extPeriod, setPeriod: extSe
   const totals = {}
   for (const r of rows.filter((x) => x.statusi !== 'anuluar' && x.statusi !== 'draft')) totals[r.monedha] = (totals[r.monedha] ?? 0) + r.totali
 
+  // Raporti zë vendin e listës (jo dritare mbi të); "Kthehu" rikthen historikun.
+  if (report) return <PeriodReport initialPeriod={period} onClose={() => setReport(false)} />
+
   return (
     <>
       <div className="card history-filters">
@@ -156,7 +159,6 @@ export function InvoiceList({ fixedClientId, period: extPeriod, setPeriod: extSe
       {error && <div className="alert error">{error}</div>}
 
       {preview && <InvoicePreview invoice={preview} onClose={() => setPreview(null)} />}
-      {report && <PeriodReport initialPeriod={period} onClose={() => setReport(false)} />}
 
       <div className="card no-pad">
         {s.sort && more && <div className="sort-hint">Renditja vlen për faturat e kësaj faqeje. Përdorni filtrat për të ngushtuar listën.</div>}

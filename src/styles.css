@@ -893,3 +893,9 @@ th.sortable.sorted .sort-icon { opacity: 1; }
 .password-field input { width: 100%; padding-right: 42px; }
 .password-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: 0; padding: 6px; color: #64748b; cursor: pointer; display: grid; place-items: center; border-radius: 6px; }
 .password-eye:hover { color: #0f172a; background: #f1f5f9; }
+
+/* Raporti i periudhës brenda faqes së historikut */
+.pr-page { padding: 18px 20px; }
+.pr-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+.pr-head h2 { margin: 0; font-size: 1.15rem; }
+.pr-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }

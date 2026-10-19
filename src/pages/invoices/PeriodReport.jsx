@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getDocs, orderBy, query, where } from 'firebase/firestore'
-import { Download, Printer } from 'lucide-react'
+import { ArrowLeft, Download, Printer } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
 import { useSettings } from '../../hooks/useSettings'
@@ -12,7 +12,6 @@ import { canSeeCost } from '../../config/roles'
 import { formatMoney, toLek } from '../../utils/money'
 import { millis, toInputDate } from '../../utils/date'
 import { downloadCsv } from '../../utils/csv'
-import Modal from '../../components/Modal'
 
 const MONTHS = ['Janar', 'Shkurt', 'Mars', 'Prill', 'Maj', 'Qershor', 'Korrik', 'Gusht', 'Shtator', 'Tetor', 'Nëntor', 'Dhjetor']
 const pad = (n) => String(n).padStart(2, '0')
@@ -137,7 +136,11 @@ export default function PeriodReport({ initialPeriod, onClose }) {
   const years = Array.from({ length: now.getFullYear() - 2019 }, (_, i) => String(now.getFullYear() - i))
 
   return (
-    <Modal title="Raport sipas periudhës" onClose={onClose} wide>
+    <div className="card pr-page">
+      <div className="pr-head">
+        <button type="button" className="btn" onClick={onClose}><ArrowLeft size={16} /> Kthehu te historiku</button>
+        <h2>Raport sipas periudhës</h2>
+      </div>
       <div className="pr-toolbar">
         <div className="period-tabs">
           <button type="button" className={mode === 'month' ? 'active' : ''} onClick={() => setMode('month')}>Muaji</button>
@@ -179,12 +182,12 @@ export default function PeriodReport({ initialPeriod, onClose }) {
             </table>
           </div>
           <p className="muted small">Detyrimi = shitje − arkëtime e periudhës (+ borxhi u rrit, − u arkëtua më shumë). Shumat në EUR/USD janë kthyer në LEK me kursin e çdo dokumenti.</p>
-          <div className="modal-actions">
+          <div className="pr-actions">
             <button className="btn" onClick={() => downloadCsv(`raport_${mode === 'year' ? year : month}.csv`, headers, [...rows.map(line), totalLine])}><Download size={16} /> CSV</button>
             <button className="btn primary" onClick={print}><Printer size={16} /> Printo / PDF</button>
           </div>
         </>
       )}
-    </Modal>
+    </div>
   )
 }
