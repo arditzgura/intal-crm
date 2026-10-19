@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { getDoc } from 'firebase/firestore'
-import { Trash2, UserPlus, Save, CheckCircle2, CheckCheck, FileText, AlertTriangle, RotateCcw, Pencil, Clock, Plus, MessageSquareText, Calculator, Wallet, Scale, ArrowLeft } from 'lucide-react'
+import { Trash2, UserPlus, Save, CheckCircle2, CheckCheck, FileText, AlertTriangle, RotateCcw, Pencil, Clock, Plus, MessageSquareText, Calculator, Wallet, Scale, ArrowLeft, X } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
+import InvoicePreview from '../../components/invoice/InvoicePreview'
 import { useLive } from '../../hooks/useLive'
 import { useSettings } from '../../hooks/useSettings'
 import { watchClients } from '../../services/clientService'
@@ -31,14 +32,97 @@ function autoPrice(item, prefs, monedha, kursi) {
   return Math.round((lek * RATE_SCALE) / kursi)
 }
 
+/**
+ * Faturë e Re me skeda (si në shfletues): disa fatura të hapura njëkohësisht.
+ * Çdo skedë është një redaktor më vete; skeda e parë lidhet me URL-në (?draft= / ?korrigjo=).
+ * Emri i skedës = klienti i zgjedhur, përndryshe "Klient Rastësor".
+ */
+const MAX_TABS = 5
+let tabSeq = 1
+const newTab = () => ({ key: `t${tabSeq++}`, title: 'Klient Rastësor' })
+
 export default function NewInvoicePage() {
+  const { settings } = useSettings()
+  const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const editing = !!params.get('korrigjo')
+  const [tabs, setTabs] = useState(() => [newTab()])
+  const [active, setActive] = useState(() => tabs[0].key)
+  const [issued, setIssued] = useState(null)
+  // Hapja e një drafti / ndryshimi (URL) ngarkohet te skeda e parë → shfaqe atë.
+  const urlDoc = params.get('draft') ?? params.get('korrigjo')
+  useEffect(() => { if (urlDoc) setActive((cur) => tabs[0]?.key ?? cur) }, [urlDoc]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Ndryshon vetëm kur titulli është i ri (përndryshe kthen të njëjtën listë → pa rirenderim pa fund)
+  const setTitle = useCallback((key, title) => setTabs((ts) => (ts.some((t) => t.key === key && t.title !== title) ? ts.map((t) => (t.key === key ? { ...t, title } : t)) : ts)), [])
+  function addTab() {
+    if (tabs.length >= MAX_TABS) return
+    const t = newTab()
+    setTabs((ts) => [...ts, t])
+    setActive(t.key)
+  }
+  function closeTab(key) {
+    if (tabs.length === 1) return
+    if (!window.confirm('Të mbyllet kjo faturë? Të dhënat e paruajtura humbasin.')) return
+    const i = tabs.findIndex((t) => t.key === key)
+    const rest = tabs.filter((t) => t.key !== key)
+    setTabs(rest)
+    if (active === key) setActive(rest[Math.max(0, i - 1)].key)
+  }
+  // Pas lëshimit: me një skedë hapet fatura; me disa, shfaqet parapamja dhe skeda rifillon bosh.
+  async function onIssued(key, id) {
+    if (tabs.length === 1) return navigate(`/fatura/${id}`)
+    const snap = await getDoc(companyDoc('invoices', id))
+    if (snap.exists()) setIssued({ id: snap.id, ...snap.data() })
+    const fresh = newTab()
+    setTabs((ts) => ts.map((t) => (t.key === key ? fresh : t)))
+    setActive(fresh.key)
+  }
+
+  return (
+    <div>
+      {!editing && (
+        <div className="ni-tabs" role="tablist">
+          {tabs.map((t) => (
+            <div key={t.key} role="tab" aria-selected={active === t.key} className={`ni-tab ${active === t.key ? 'active' : ''}`} onClick={() => setActive(t.key)} title={t.title}>
+              <FileText size={14} />
+              <span>{t.title}</span>
+              {tabs.length > 1 && (
+                <button type="button" className="ni-tab-x" onClick={(e) => { e.stopPropagation(); closeTab(t.key) }} aria-label="Mbyll faturën"><X size={13} /></button>
+              )}
+            </div>
+          ))}
+          {tabs.length < MAX_TABS && (
+            <button type="button" className="ni-tab-add" onClick={addTab} title="Faturë e re në skedë tjetër"><Plus size={16} /></button>
+          )}
+        </div>
+      )}
+      {tabs.map((t, i) => (
+        <div key={t.key} style={{ display: active === t.key || editing ? 'block' : 'none' }}>
+          {(i === 0 || !editing) && (
+            <InvoiceEditor
+              urlBound={i === 0}
+              onTitle={(title) => setTitle(t.key, title)}
+              onIssued={(id) => onIssued(t.key, id)}
+            />
+          )}
+        </div>
+      ))}
+      {issued && <InvoicePreview invoice={issued} onClose={() => setIssued(null)} />}
+    </div>
+  )
+}
+
+function InvoiceEditor({ urlBound, onTitle, onIssued }) {
   const { perms, profile } = useAuth()
   const { settings } = useSettings()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
-  const draftId = params.get('draft')
+  // Vetëm skeda e parë lexon/shkruan URL-në; të tjerat mbajnë draftin në gjendjen e tyre.
+  const [ownDraft, setOwnDraft] = useState(null)
+  const draftId = urlBound ? params.get('draft') : ownDraft
   // Ndryshimi i faturës së fundit të klientit (në vend): numri, data, klienti dhe monedha mbeten.
-  const korrigjoId = draftId ? null : params.get('korrigjo')
+  const korrigjoId = urlBound && !draftId ? params.get('korrigjo') : null
   const [orig, setOrig] = useState(null)
 
   const { data: clients } = useLive(watchClients, [], { initial: [] })
@@ -81,6 +165,7 @@ export default function NewInvoicePage() {
   }, [focusTarget, lines])
 
   const client = clients.find((c) => c.id === clientId) ?? null
+  useEffect(() => { onTitle?.(client?.emri ?? 'Klient Rastësor') }, [client?.emri, onTitle])
   const kursi = monedha === 'LEK' ? RATE_SCALE : parseRate(kursiText)
   const { data: prefList } = useLive((ok, ko) => watchPricesForClient(clientId, ok, ko), [clientId], { enabled: !!clientId, initial: [] })
   const prefs = useMemo(() => Object.fromEntries((clientId ? prefList : []).map((p) => [p.itemId, p.cmimi])), [prefList, clientId])
@@ -262,7 +347,8 @@ export default function NewInvoicePage() {
     setBusy(true)
     try {
       const id = await saveDraft(draftId, payload(), profile?.emri)
-      setParams({ draft: id }, { replace: true })
+      if (urlBound) setParams({ draft: id }, { replace: true })
+      else setOwnDraft(id)
       setInfo('Drafti u ruajt.')
     } catch (err) {
       setError(err.code ? errorMessage(err) : err.message)
@@ -295,7 +381,8 @@ export default function NewInvoicePage() {
       const { id } = orig
         ? await editInvoice(orig.id, { rreshtat: p.rreshtat, paguar: p.paguar, metodaPagese: p.metodaPagese, shenime: p.shenime }, profile?.emri)
         : await issueInvoice(draftId, p, profile?.emri)
-      navigate(`/fatura/${id}`)
+      if (onIssued) await onIssued(id)
+      else navigate(`/fatura/${id}`)
     } catch (err) {
       setError(err.code ? errorMessage(err) : err.message)
       setBusy(false)
@@ -313,7 +400,8 @@ export default function NewInvoicePage() {
   }
 
   function resetForm() {
-    navigate('/fature-e-re')
+    if (urlBound) navigate('/fature-e-re')
+    else setOwnDraft(null)
     setClientId('')
     setLines([emptyLine()])
     setShenime('')
