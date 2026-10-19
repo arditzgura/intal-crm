@@ -887,3 +887,9 @@ th.sortable.sorted .sort-icon { opacity: 1; }
 .ip-city { display: flex; align-items: center; gap: 3px; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: #94a3b8; margin-top: 2px; }
 .ip-pill { display: inline-block; background: #f1f5f9; color: #475569; border-radius: 999px; padding: 2px 10px; font-size: 0.66rem; font-weight: 800; text-transform: uppercase; }
 @media (max-width: 700px) { .ip-kpi b { font-size: 1.5rem; } .ip-panel { padding: 16px; } .ip-panel .pad { padding: 14px 16px; } }
+
+/* Fusha e fjalëkalimit me sy */
+.password-field { position: relative; display: block; }
+.password-field input { width: 100%; padding-right: 42px; }
+.password-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: 0; padding: 6px; color: #64748b; cursor: pointer; display: grid; place-items: center; border-radius: 6px; }
+.password-eye:hover { color: #0f172a; background: #f1f5f9; }

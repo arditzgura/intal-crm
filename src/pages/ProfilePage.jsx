@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import PasswordInput from '../components/PasswordInput'
 import { useAuth } from '../hooks/useAuth'
 import { ROLES } from '../config/roles'
 import { changePassword, errorMessage, logout } from '../services/authService'
@@ -47,15 +48,15 @@ export default function ProfilePage() {
         <h3>Ndrysho fjalëkalimin</h3>
         <label className="field">
           <span>Fjalëkalimi aktual</span>
-          <input type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} required />
+          <PasswordInput autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} required />
         </label>
         <label className="field">
           <span>Fjalëkalimi i ri</span>
-          <input type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} required />
+          <PasswordInput autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} required />
         </label>
         <label className="field">
           <span>Përsërit fjalëkalimin e ri</span>
-          <input type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
+          <PasswordInput autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
         </label>
         {msg && <div className={`alert ${msg.type}`}>{msg.text}</div>}
         <button className="btn primary" disabled={busy}>

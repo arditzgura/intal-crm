@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import PasswordInput from '../components/PasswordInput'
 import { login, errorMessage } from '../services/authService'
 
 export default function LoginPage() {
@@ -33,7 +34,7 @@ export default function LoginPage() {
         </label>
         <label className="field">
           <span>Fjalëkalimi</span>
-          <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <PasswordInput autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </label>
         {error && <div className="alert error">{error}</div>}
         <button className="btn primary block" disabled={busy}>
