@@ -946,3 +946,4 @@ th.sortable.sorted .sort-icon { opacity: 1; }
 .th2-sum.final { font-size: 15px; font-weight: 900; border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 4px 0; margin-top: 3px; }
 .th2-sum.final b { font-size: 16px; }
 .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.ni-edit-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }

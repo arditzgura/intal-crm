@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { getDoc } from 'firebase/firestore'
-import { Trash2, UserPlus, Save, CheckCircle2, CheckCheck, FileText, AlertTriangle, RotateCcw, Pencil, Clock, Plus, MessageSquareText, Calculator, Wallet, Scale } from 'lucide-react'
+import { Trash2, UserPlus, Save, CheckCircle2, CheckCheck, FileText, AlertTriangle, RotateCcw, Pencil, Clock, Plus, MessageSquareText, Calculator, Wallet, Scale, ArrowLeft } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
 import { useSettings } from '../../hooks/useSettings'
@@ -344,9 +344,9 @@ export default function NewInvoicePage() {
       </div>
 
       {orig && (
-        <div className="alert info ni-edit-banner">
-          Po ndryshoni faturën <b>#{orig.numriTekst}</b> të {orig.klient?.emri}. Numri, data dhe klienti mbeten të njëjtë;
-          ndryshoni artikujt ose pagesën dhe ruani. <Link to="/historiku">Anulo ndryshimin</Link>
+        <div className="ni-edit-bar">
+          <button type="button" className="ip-back" onClick={() => navigate(-1)} title="Kthehu pa ruajtur asnjë ndryshim"><ArrowLeft size={15} /> Mbrapa</button>
+          <span className="muted small">Ndryshim i faturës <b>#{orig.numriTekst}</b> · {orig.klient?.emri}</span>
         </div>
       )}
       <div className="card ni-card">
