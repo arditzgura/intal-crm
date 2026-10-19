@@ -12,6 +12,7 @@ export const LEDGER_TYPES = {
   rregullim: { label: 'Rregullim manual i gjendjes', sign: 0, perm: 'rregullim_gjendjeje' },
   anulim: { label: 'Anulim fature', sign: 0, perm: null }, // krijohet vetëm nga anulimi i faturës
   anulim_pagese: { label: 'Anulim pagese', sign: 1, perm: null }, // krijohet vetëm nga heqja e shenjës "E paguar" (fatura e fundit)
+  ndryshim_fature: { label: 'Ndryshim fature', sign: 0, perm: null }, // diferenca e totalit kur ndryshohet fatura e fundit
 }
 
 // Lëvizjet që zgjidhen te "Lëvizje tjetër"

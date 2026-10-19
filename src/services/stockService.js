@@ -23,6 +23,7 @@ export const MOVEMENT_TYPES = {
   kthim_anulim: 'Kthim nga anulimi i faturës',
   anulim_hyrje: 'Anulim hyrjeje',
   rregullim: 'Rregullim / inventarizim',
+  ndryshim_fature: 'Ndryshim fature (diferenca)',
 }
 
 /** Bashkon rreshtat sipas artikullit: [{ itemId, sasia }] (një lëvizje për artikull për dokument). */

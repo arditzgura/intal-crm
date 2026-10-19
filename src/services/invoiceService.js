@@ -15,6 +15,7 @@ import {
   writePointsEntry, numbersText, planLatestChange, applyLatestChange,
 } from './invoiceChain'
 import { millis } from '../utils/date'
+import { formatMoney } from '../utils/money'
 
 /**
  * Faturat.
@@ -398,21 +399,25 @@ export async function cancelInvoice(id, arsye, actorName, { kthePagesen = false 
 }
 
 /**
- * Pagesat e regjistruara te fatura (lëvizjet "pagese" të kartelës me faturaId = fatura),
- * pa ato që janë anuluar tashmë, bashkë me lëvizjet e tyre në arkë/bankë.
+ * Pagesat e faturës: lëvizjet e kartelës me faturaId = fatura, "pagese" (−) dhe "anulim_pagese" (+).
+ * total = paguar neto; byAccount = paratë neto në arkë/bankë nga këto lëvizje.
  */
 export async function paymentsOfInvoice(inv) {
-  const skip = new Set(inv.pagesatAnuluara ?? [])
   const snap = await getDocs(query(companyCol('ledger'), where('faturaId', '==', inv.id)))
-  const payments = snap.docs
+  const entries = snap.docs
     .map((d) => ({ id: d.id, ...d.data() }))
-    .filter((e) => e.tipi === 'pagese' && e.shuma < 0 && !skip.has(e.id))
-  const cash = []
-  for (const p of payments) {
-    const c = await getDocs(query(companyCol('cashMovements'), where('ledgerId', '==', p.id)))
-    for (const d of c.docs) cash.push({ id: d.id, ...d.data() })
+    .filter((e) => (e.tipi === 'pagese' && e.shuma < 0) || e.tipi === 'anulim_pagese')
+  const byAccount = {}
+  for (const e of entries) {
+    const c = await getDocs(query(companyCol('cashMovements'), where('ledgerId', '==', e.id)))
+    for (const d of c.docs) byAccount[d.data().llogaria] = (byAccount[d.data().llogaria] ?? 0) + d.data().shuma
   }
-  return { payments, cash, total: payments.reduce((a, p) => a - p.shuma, 0) }
+  return {
+    payments: entries.filter((e) => e.tipi === 'pagese'),
+    entries,
+    byAccount,
+    total: entries.reduce((a, e) => a - e.shuma, 0),
+  }
 }
 
 /**
@@ -442,7 +447,6 @@ export async function unmarkPaid(id, arsye, actorName) {
     const cSnap = await tx.get(clientRef)
     const client = cSnap.data()
     if (client.faturaFundit?.[X.monedha] !== id) throw new Error('Lejohet vetëm te fatura e fundit e klientit.')
-    if ((X.pagesatAnuluara ?? []).some((p) => found.payments.some((f) => f.id === p))) throw new Error('Pagesa është anuluar tashmë. Rifreskoni faqen.')
     // Faturat para saj me borxh të bartur që u mbyllën nga kjo pagesë → "Pasuar"
     const back = []
     let pid = X.faturaPara
@@ -461,8 +465,8 @@ export async function unmarkPaid(id, arsye, actorName) {
     const para = client.gjendje?.[X.monedha] ?? 0
     const shenim = `Anulim pagese – fatura #${X.numriTekst}`
     tx.set(entryRef, ledgerEntryData({ clientId: X.clientId, tipi: 'anulim_pagese', monedha: X.monedha, kursi: X.kursi, shuma, data: new Date(), para, shenim, arsye: arsye.trim(), faturaId: id }, actorName))
-    for (const c of found.cash) {
-      writeCash(tx, { llogaria: c.llogaria, monedha: c.monedha, kursi: c.kursi, shuma: -c.shuma, tipi: 'anulim_pagese', data: new Date(), shenim: `${client.emri} – ${shenim}`, clientId: X.clientId, ledgerId: entryRef.id, invoiceId: id }, actorName)
+    for (const [llogaria, v] of Object.entries(found.byAccount)) {
+      if (v > 0) writeCash(tx, { llogaria, monedha: X.monedha, kursi: X.kursi, shuma: -v, tipi: 'anulim_pagese', data: new Date(), shenim: `${client.emri} – ${shenim}`, clientId: X.clientId, ledgerId: entryRef.id, invoiceId: id }, actorName)
     }
     const mbetur = X.mbetur + shuma
     const gjendjaRe = X.gjendjaPara + X.totali
@@ -472,7 +476,6 @@ export async function unmarkPaid(id, arsye, actorName) {
       paguar: 0,
       gjendjaRe,
       piketDhene: 0,
-      pagesatAnuluara: [...(X.pagesatAnuluara ?? []), ...found.payments.map((p) => p.id)],
     })
     for (const b of back) tx.update(b.ref, { statusi: 'pasuar', piketDhene: 0 })
 
@@ -521,6 +524,155 @@ export async function correctInvoice(id, arsye, actorName) {
     metodaPagese: X.metodaPagese ?? 'arke',
   }, actorName)
 }
+
+// ---------- Ndryshimi i faturës së fundit (në vend) ----------
+
+/** Id-të e rreshtave të statistikave për një version të artikujve të faturës. */
+const versionLineId = (invoiceId, ver, i) => (ver ? `${invoiceId}_e${ver}_${i}` : lineId(invoiceId, i))
+
+/**
+ * Ndryshon faturën e FUNDIT të klientit pa i ndryshuar numrin, datën, klientin dhe monedhën:
+ * vetëm artikujt, shënimet dhe pagesën (pra edhe statusin). Në një transaction:
+ *  - stoku: diferenca për çdo artikull (lëvizje "ndryshim_fature");
+ *  - kartela: diferenca e totalit ("ndryshim_fature") + diferenca e pagesës
+ *    ("pagese" nëse rritet, "anulim_pagese" nëse ulet), me lëvizjet përkatëse në arkë/bankë;
+ *  - rreshtat e statistikave: versioni i vjetër shënohet i anuluar, shtohet i riu;
+ *  - statusi rillogaritet; zinxhiri "Pasuar" dhe pikët përshtaten si te pagesa/anulimi i pagesës.
+ * `paguar` = gjithë pagesat e faturës pas ndryshimit (fillon nga pagesat ekzistuese të saj).
+ */
+export async function editInvoice(id, data, actorName) {
+  const rreshtat = cleanLines(data.rreshtat)
+  if (!rreshtat.length) throw new Error('Fatura nuk ka asnjë artikull.')
+  const paguarRi = Math.trunc(Number(data.paguar) || 0)
+  if (paguarRi < 0) throw new Error('Shuma e paguar nuk mund të jetë negative.')
+  const pre = await getDoc(invoiceRef(id))
+  if (!pre.exists()) throw new Error('Fatura nuk ekziston.')
+  const found = await paymentsOfInvoice({ id, ...pre.data() })
+  const totaliRi = sumLines(rreshtat)
+
+  return runTransaction(db, async (tx) => {
+    // ---------- leximet ----------
+    const invSnap = await tx.get(invoiceRef(id))
+    const X = invSnap.data()
+    if (!['pa_paguar', 'e_paguar'].includes(X.statusi)) throw new Error('Kjo faturë nuk mund të ndryshohet.')
+    const clientRef = companyDoc('clients', X.clientId)
+    const client = (await tx.get(clientRef)).data()
+    if (client.faturaFundit?.[X.monedha] !== id) throw new Error('Mund të ndryshohet vetëm fatura e fundit e klientit.')
+    const settings = await readSettings(tx)
+
+    const dT = totaliRi - X.totali
+    const dP = paguarRi - found.total
+    const mbetur = X.mbetur + dT - dP
+    const statusi = mbetur <= 0 ? 'e_paguar' : 'pa_paguar'
+    // Zinxhiri i faturave para saj
+    let forward = [] // "Pasuar" → "E paguar" (fatura u shlye)
+    const back = [] // "E paguar" → "Pasuar" (fatura nuk është më e shlyer)
+    if (X.statusi === 'pa_paguar' && statusi === 'e_paguar') forward = await readPasuarChain(tx, X)
+    if (X.statusi === 'e_paguar' && statusi === 'pa_paguar') {
+      let pid = X.faturaPara
+      for (let i = 0; pid && i < 1000; i++) {
+        const s = await tx.get(invoiceRef(pid))
+        if (!s.exists()) break
+        const d = s.data()
+        if (d.statusi === 'anuluar') { pid = d.faturaPara; continue }
+        if (d.statusi !== 'e_paguar' || !(d.gjendjaRe > 0)) break
+        back.push({ id: pid, ref: s.ref, data: d })
+        pid = d.faturaPara
+      }
+    }
+
+    // ---------- shkrimet ----------
+    const now = serverTimestamp()
+    const by = { uid: auth.currentUser.uid, emri: actorName ?? '' }
+    const ver = (X.versioniRreshtave ?? 0) + 1
+    const gjendjaRe = X.gjendjaPara + totaliRi - paguarRi
+    const self = { id, ref: invSnap.ref, data: { ...X, totali: totaliRi, piketDhene: statusi === 'e_paguar' ? X.piketDhene : 0 } }
+    const pts = X.statusi === 'pa_paguar' && statusi === 'e_paguar' ? awardPoints([self, ...forward], client, settings) : { per: {}, total: 0 }
+
+    tx.update(invSnap.ref, {
+      rreshtat,
+      nentotali: totaliRi,
+      totali: totaliRi,
+      paguar: paguarRi,
+      metodaPagese: paguarRi > 0 ? (data.metodaPagese ?? X.metodaPagese ?? 'arke') : null,
+      gjendjaRe,
+      mbetur,
+      statusi,
+      shenime: (data.shenime ?? X.shenime ?? '').trim(),
+      piketDhene: statusi === 'e_paguar' ? (X.piketDhene || pts.per[id] || 0) : 0,
+      versioniRreshtave: ver,
+      ndryshuarFature: now,
+      ndryshuarNga: by,
+    })
+    for (const c of forward) tx.update(c.ref, { statusi: 'e_paguar', ...(pts.per[c.id] ? { piketDhene: pts.per[c.id] } : {}) })
+    for (const b of back) tx.update(b.ref, { statusi: 'pasuar', piketDhene: 0 })
+
+    // Rreshtat e statistikave: i vjetri anulohet, i riu shtohet
+    ;(X.rreshtat ?? []).forEach((_, i) => tx.update(companyDoc('invoiceLines', versionLineId(id, ver - 1, i)), { anuluar: true }))
+    rreshtat.forEach((l, i) => {
+      tx.set(companyDoc('invoiceLines', versionLineId(id, ver, i)), {
+        invoiceId: id, numri: X.numri, data: X.data, clientId: X.clientId, itemId: l.itemId,
+        sasia: l.sasia, cmimi: l.cmimi, totali: l.totali, monedha: X.monedha, kursi: X.kursi, anuluar: false,
+      })
+    })
+
+    // Stoku: vetëm diferenca për çdo artikull
+    const qty = new Map()
+    for (const m of aggregateByItem(X.rreshtat ?? [])) qty.set(m.itemId, (qty.get(m.itemId) ?? 0) + m.sasia)
+    for (const m of aggregateByItem(rreshtat)) qty.set(m.itemId, (qty.get(m.itemId) ?? 0) - m.sasia)
+    for (const [itemId, kthim] of qty) {
+      writeMovement(tx, { itemId, sasia: kthim, tipi: 'ndryshim_fature', dokument: 'fature', invoiceId: id, numri: X.numri, data: X.data }, actorName)
+    }
+
+    // Kartela + arka
+    const ledgerIds = []
+    let bal = client.gjendje?.[X.monedha] ?? 0
+    const addLedger = (fields) => {
+      const lref = newDocRef('ledger')
+      tx.set(lref, ledgerEntryData({ clientId: X.clientId, monedha: X.monedha, kursi: X.kursi, data: new Date(), para: bal, faturaId: id, ...fields }, actorName))
+      bal += fields.shuma
+      ledgerIds.push(lref.id)
+      return lref.id
+    }
+    if (dT) addLedger({ tipi: 'ndryshim_fature', shuma: dT, shenim: `Ndryshim i faturës #${X.numriTekst} (${formatMoney(X.totali)} → ${formatMoney(totaliRi)})` })
+    const metoda = data.metodaPagese ?? 'arke'
+    if (dP > 0) {
+      const pid = addLedger({ tipi: 'pagese', shuma: -dP, metoda, shenim: `Paguar te fatura #${X.numriTekst} (ndryshim)` })
+      writeCash(tx, { llogaria: metoda, monedha: X.monedha, kursi: X.kursi, shuma: dP, tipi: 'arketim', data: new Date(), shenim: `${client.emri} – fatura #${X.numriTekst}`, clientId: X.clientId, ledgerId: pid, invoiceId: id }, actorName)
+    } else if (dP < 0) {
+      const lid = addLedger({ tipi: 'anulim_pagese', shuma: -dP, arsye: 'Ndryshim fature – u ul shuma e paguar', shenim: `Anulim pagese – fatura #${X.numriTekst} (ndryshim)` })
+      writeCash(tx, { llogaria: metoda, monedha: X.monedha, kursi: X.kursi, shuma: dP, tipi: 'anulim_pagese', data: new Date(), shenim: `${client.emri} – ndryshim i faturës #${X.numriTekst}`, clientId: X.clientId, ledgerId: lid, invoiceId: id }, actorName)
+    }
+
+    // Pikët
+    let pointsPatch = {}
+    if (!client.rastesor) {
+      if (pts.total > 0) {
+        pointsPatch = writePointsEntry(tx, { clientId: X.clientId, client, pike: pts.total, tipi: 'fituar', arsye: `Fatura të paguara: ${numbersText([self, ...forward].filter((i) => pts.per[i.id]))}`, invoiceIds: Object.keys(pts.per) }, actorName)
+      } else if (back.length || (X.statusi === 'e_paguar' && statusi === 'pa_paguar')) {
+        const pike = (X.piketDhene ?? 0) + back.reduce((a, b) => a + (b.data.piketDhene ?? 0), 0)
+        pointsPatch = writePointsEntry(tx, { clientId: X.clientId, client, pike: -pike, tipi: 'anulim_pagese', arsye: `Fatura #${X.numriTekst} u ndryshua dhe nuk është më e paguar`, invoiceIds: [id, ...back.map((b) => b.id)] }, actorName)
+      }
+    }
+
+    if (ledgerIds.length || Object.keys(pointsPatch).length) {
+      tx.update(clientRef, { ...(ledgerIds.length ? { [`gjendje.${X.monedha}`]: bal, lastLedgerIds: ledgerIds } : {}), ...pointsPatch })
+    }
+    addAudit(tx, {
+      action: 'ndryshim_fature',
+      entity: 'invoices',
+      entityId: id,
+      details: {
+        numri: X.numri, klienti: client.emri, monedha: X.monedha,
+        totaliPara: X.totali, totali: totaliRi, paguarPara: found.total, paguar: paguarRi,
+        statusiPara: X.statusi, statusi, rreshtatPara: X.rreshtat.length, rreshtat: rreshtat.length,
+      },
+      actorName,
+    })
+    return { id }
+  })
+}
+
 
 // ---------- Leximet ----------
 

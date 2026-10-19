@@ -222,8 +222,13 @@ export function InvoiceList({ fixedClientId, period: extPeriod, setPeriod: extSe
                       {isDraft && perms.has('fature_leshim') && (
                         <button className="icon-btn" title="Ndrysho draftin" onClick={open}><Pencil size={17} /></button>
                       )}
-                      {!isDraft && r.statusi !== 'anuluar' && perms.has('anulim_fature') && perms.has('fature_leshim') && (
-                        <button className="icon-btn" title="Ndrysho faturën (hapet te Fatura e Re)" onClick={() => navigate(`/fature-e-re?korrigjo=${r.id}`)}><Pencil size={17} /></button>
+                      {!isDraft && r.statusi !== 'anuluar' && perms.has('fature_leshim') && (
+                        <button
+                          className="icon-btn"
+                          disabled={!!r.faturaPas}
+                          title={r.faturaPas ? 'Mund të ndryshohet vetëm fatura e fundit e klientit' : 'Ndrysho faturën (numri dhe data mbeten)'}
+                          onClick={() => navigate(`/fature-e-re?korrigjo=${r.id}`)}
+                        ><Pencil size={17} /></button>
                       )}
                       {isDraft && perms.has('fature_leshim') && (
                         <button className="icon-btn danger-text" title="Fshi draftin" onClick={() => onDeleteDraft(r)}><Trash2 size={17} /></button>
@@ -398,7 +403,7 @@ function UnpayInvoiceModal({ inv, actorName, onClose }) {
     }
   }
 
-  const cash = found ? found.cash.reduce((m, c) => ({ ...m, [c.llogaria]: (m[c.llogaria] ?? 0) + c.shuma }), {}) : {}
+  const cash = found ? Object.fromEntries(Object.entries(found.byAccount).filter(([, v]) => v > 0)) : {}
   return (
     <Modal title={`Ktheje "Pa paguar" – fatura #${inv.numriTekst}`} onClose={onClose}>
       <form onSubmit={onSubmit}>
@@ -414,8 +419,8 @@ function UnpayInvoiceModal({ inv, actorName, onClose }) {
               fatura kalon në <b>Pa paguar</b>.
             </p>
             <ul className="small">
-              {found.payments.map((p) => (
-                <li key={p.id}>{formatDate(p.data)} – {formatMoney(-p.shuma, p.monedha)}{p.shenim ? ` (${p.shenim})` : ''}</li>
+              {found.entries.map((p) => (
+                <li key={p.id}>{formatDate(p.data)} – {p.shuma < 0 ? '' : '−'}{formatMoney(Math.abs(p.shuma), p.monedha)}{p.shenim ? ` (${p.shenim})` : ''}</li>
               ))}
             </ul>
             {Object.keys(cash).length > 0 && (

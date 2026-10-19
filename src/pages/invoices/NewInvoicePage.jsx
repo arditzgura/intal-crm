@@ -7,7 +7,7 @@ import { useLive } from '../../hooks/useLive'
 import { useSettings } from '../../hooks/useSettings'
 import { watchClients } from '../../services/clientService'
 import { watchItems, watchPricesForClient } from '../../services/itemService'
-import { saveDraft, deleteDraft, issueInvoice, cancelInvoice, watchDrafts, watchNextInvoiceNumber } from '../../services/invoiceService'
+import { saveDraft, deleteDraft, issueInvoice, editInvoice, paymentsOfInvoice, watchDrafts, watchNextInvoiceNumber } from '../../services/invoiceService'
 import { formatDocNumber } from '../../services/settingsService'
 import { watchStock } from '../../services/stockService'
 import { companyDoc } from '../../services/paths'
@@ -37,7 +37,7 @@ export default function NewInvoicePage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const draftId = params.get('draft')
-  // Ndryshimi i një fature të lëshuar: hapet këtu; ruajtja e anulon dhe lëshon të renë.
+  // Ndryshimi i faturës së fundit të klientit (në vend): numri, data, klienti dhe monedha mbeten.
   const korrigjoId = draftId ? null : params.get('korrigjo')
   const [orig, setOrig] = useState(null)
 
@@ -97,7 +97,13 @@ export default function NewInvoicePage() {
           setError('Fatura nuk u gjet ose është anuluar.')
           return
         }
-        setOrig({ id: snap.id, ...snap.data() })
+        const o = { id: snap.id, ...snap.data() }
+        setOrig(o)
+        // Pagesa e faturës = gjithë pagesat e regjistruara te ajo (neto)
+        paymentsOfInvoice(o).then((f) => {
+          setPaguarText(f.total ? formatMoney(f.total) : '')
+          setPaguarTouched(true)
+        }).catch((err) => setError(errorMessage(err)))
       } else if (!snap.exists() || snap.data().statusi !== 'draft') {
         setError('Drafti nuk u gjet ose është lëshuar tashmë.')
         return
@@ -206,9 +212,8 @@ export default function NewInvoicePage() {
   const overStock = (itemId) => (qtyByItem[itemId] ?? 0) > (stock[itemId] ?? 0) + (origQty[itemId] ?? 0)
 
   // ---------- Gjendja / pagesa ----------
-  // Gjatë ndryshimit: gjendja pa faturën e vjetër (anulimi ia heq totalin; pagesa e saj mbetet në kartelë).
-  const origShare = orig && orig.clientId === clientId && orig.monedha === monedha ? orig.totali : 0
-  const gjAuto = (client?.gjendje?.[monedha] ?? 0) - origShare
+  // Gjatë ndryshimit gjendja e mëparshme është ajo e printuar te fatura dhe nuk ndryshon.
+  const gjAuto = orig ? orig.gjendjaPara ?? 0 : client?.gjendje?.[monedha] ?? 0
   const gjManual = gjParaText != null ? parseMoney(gjParaText) : null
   const gjendjaPara = gjManual ?? gjAuto
   const manualChanged = gjParaText != null && gjManual != null && gjManual !== gjAuto
@@ -281,13 +286,15 @@ export default function NewInvoicePage() {
       `Paguar (−): ${formatMoney(pay, monedha)} (${PAYMENT_METHODS[metoda]})\n` +
       `Detyrimi përfundimtar: ${formatMoney(after, monedha)}\n\n` +
       (orig
-        ? `Fatura #${orig.numriTekst} anulohet dhe zëvendësohet nga kjo faturë (me numër të ri).`
+        ? `Fatura #${orig.numriTekst} ruhet me të njëjtin numër dhe datë; stoku, kartela dhe arka përshtaten me diferencën.`
         : 'Pas lëshimit fatura nuk ndryshohet (korrigjohet me anulim).')
     if (!window.confirm(msg)) return
     setBusy(true)
     try {
-      if (orig) await cancelInvoice(orig.id, 'Ndryshim fature – u zëvendësua nga fatura e re', profile?.emri, { kthePagesen: false })
-      const { id } = await issueInvoice(draftId, payload(pay), profile?.emri)
+      const p = payload(pay)
+      const { id } = orig
+        ? await editInvoice(orig.id, { rreshtat: p.rreshtat, paguar: p.paguar, metodaPagese: p.metodaPagese, shenime: p.shenime }, profile?.emri)
+        : await issueInvoice(draftId, p, profile?.emri)
       navigate(`/fatura/${id}`)
     } catch (err) {
       setError(err.code ? errorMessage(err) : err.message)
@@ -338,8 +345,8 @@ export default function NewInvoicePage() {
 
       {orig && (
         <div className="alert info ni-edit-banner">
-          Po ndryshoni faturën <b>#{orig.numriTekst}</b> të {orig.klient?.emri}. Ruajtja e anulon atë dhe lëshon faturën e
-          ndryshuar me numër të ri; pagesat e saj mbeten në kartelë. <Link to="/historiku">Anulo ndryshimin</Link>
+          Po ndryshoni faturën <b>#{orig.numriTekst}</b> të {orig.klient?.emri}. Numri, data dhe klienti mbeten të njëjtë;
+          ndryshoni artikujt ose pagesën dhe ruani. <Link to="/historiku">Anulo ndryshimin</Link>
         </div>
       )}
       <div className="card ni-card">
@@ -360,10 +367,10 @@ export default function NewInvoicePage() {
             <div className="ni-title-row">
               <div className="ni-cur">
                 {Object.keys(CURRENCIES).map((c) => (
-                  <button key={c} type="button" className={monedha === c ? 'active' : ''} onClick={() => changeCurrency(c)}>{c}</button>
+                  <button key={c} type="button" className={monedha === c ? 'active' : ''} onClick={() => changeCurrency(c)} disabled={!!orig && monedha !== c}>{c}</button>
                 ))}
               </div>
-              <div className="ni-number" title="Numri jepet përfundimisht kur lëshohet fatura"><span>#</span>{numberPreview}</div>
+              <div className="ni-number" title={orig ? 'Numri i faturës nuk ndryshon' : 'Numri jepet përfundimisht kur lëshohet fatura'}><span>#</span>{orig ? orig.numriTekst : numberPreview}</div>
             </div>
             {monedha !== 'LEK' && (
               <label className="ni-rate">1 {monedha} = <input inputMode="decimal" value={kursiText} onChange={(e) => setKursiText(e.target.value)} /> LEK</label>
@@ -376,8 +383,12 @@ export default function NewInvoicePage() {
           <div className="field">
             <span>Klienti</span>
             <div className="picker-row">
-              <div className="grow"><SearchPicker options={clientOptions} value={clientId} onChange={pickClient} placeholder="Emri i klientit…" /></div>
-              {perms.has('kliente_ndrysho') && (
+              <div className="grow">
+                {orig
+                  ? <input value={orig.klient?.emri ?? ''} disabled title="Klienti i faturës nuk ndryshon" />
+                  : <SearchPicker options={clientOptions} value={clientId} onChange={pickClient} placeholder="Emri i klientit…" />}
+              </div>
+              {perms.has('kliente_ndrysho') && !orig && (
                 <button type="button" className="btn" onClick={() => setCreatingClient(true)} title="Klient i ri"><UserPlus size={16} /></button>
               )}
             </div>
@@ -395,7 +406,7 @@ export default function NewInvoicePage() {
           </div>
           <label className="field ni-date">
             <span>Data e faturës</span>
-            <input type="date" value={dataText} onChange={(e) => setDataText(e.target.value)} />
+            <input type="date" value={dataText} onChange={(e) => setDataText(e.target.value)} disabled={!!orig} title={orig ? 'Data e faturës nuk ndryshon' : undefined} />
           </label>
         </div>
 
@@ -459,7 +470,7 @@ export default function NewInvoicePage() {
             </div>
             <div className="ni-box yellow">
               <label><Scale size={13} /> {settings.etiketat.gjendja} (+)</label>
-              <input inputMode="decimal" value={gjParaText ?? formatMoney(gjAuto)} disabled={!client || !canManualBalance}
+              <input inputMode="decimal" value={gjParaText ?? formatMoney(gjAuto)} disabled={!client || !canManualBalance || !!orig}
                 title={canManualBalance ? 'Gjendja e mëparshme e klientit (mund ta ndryshoni me arsye)' : 'Gjendja e mëparshme e klientit'}
                 onChange={(e) => setGjParaText(e.target.value)} />
               {manualChanged && (
