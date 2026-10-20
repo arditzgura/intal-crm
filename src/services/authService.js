@@ -1,14 +1,18 @@
 import {
+  sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   EmailAuthProvider,
   reauthenticateWithCredential,
   updatePassword,
 } from 'firebase/auth'
-import { auth } from '../firebase'
+import { doc, getDoc } from 'firebase/firestore'
+import { auth, db } from '../firebase'
 
 const AUTH_ERRORS = {
-  'auth/invalid-credential': 'Email-i ose fjalëkalimi është i gabuar.',
+  'auth/invalid-credential': 'Email-i / emri i përdoruesit ose fjalëkalimi është i gabuar.',
+  'auth/missing-email': 'Shkruani email-in.',
   'auth/wrong-password': 'Fjalëkalimi është i gabuar.',
   'auth/user-not-found': 'Nuk ekziston përdorues me këtë email.',
   'auth/invalid-email': 'Email-i nuk është i vlefshëm.',
@@ -28,8 +32,40 @@ export function errorMessage(err) {
   return AUTH_ERRORS[err?.code] || `Ndodhi një gabim: ${err?.message ?? err}`
 }
 
-export function login(email, password) {
-  return signInWithEmailAndPassword(auth, email.trim(), password)
+/** Emri i përdoruesit: shkronja të vogla, shifra dhe . _ - (3–30). */
+export const normalizeUsername = (u) => (u ?? '').trim().toLowerCase()
+export const validUsername = (u) => /^[a-z0-9._-]{3,30}$/.test(u)
+
+/** Hyrja me email ose me emër përdoruesi (emri përkthehet te email-i përmes usernames/{emri}). */
+export async function login(identifier, password) {
+  let email = identifier.trim()
+  if (!email.includes('@')) {
+    const snap = await getDoc(doc(db, 'usernames', normalizeUsername(email)))
+    if (!snap.exists()) {
+      const err = new Error('user-not-found')
+      err.code = 'auth/invalid-credential'
+      throw err
+    }
+    email = snap.data().email
+  }
+  return signInWithEmailAndPassword(auth, email, password)
+}
+
+/** Email për rivendosjen e fjalëkalimit (shërbim falas i Firebase). */
+export function resetPassword(email) {
+  return sendPasswordResetEmail(auth, email.trim())
+}
+
+/** Ridërgon email-in e verifikimit për përdoruesin aktual. */
+export function resendVerification() {
+  return sendEmailVerification(auth.currentUser)
+}
+
+/** Pas verifikimit: rifreskon llogarinë dhe token-in (që Rules të shohin email_verified). */
+export async function refreshVerification() {
+  await auth.currentUser.reload()
+  await auth.currentUser.getIdToken(true)
+  return auth.currentUser.emailVerified
 }
 
 export function logout() {

@@ -1,10 +1,10 @@
 import { doc, getDoc, onSnapshot, serverTimestamp, writeBatch } from 'firebase/firestore'
-import { db, COMPANY_ID } from '../firebase'
+import { db, getCompanyId, LEGACY_COMPANY_ID } from '../firebase'
 import { addAudit } from './auditService'
 import { RATE_SCALE } from '../utils/money'
 
-const settingsRef = () => doc(db, 'companies', COMPANY_ID, 'settings', 'main')
-const counterRef = (key) => doc(db, 'companies', COMPANY_ID, 'counters', key)
+const settingsRef = () => doc(db, 'companies', getCompanyId(), 'settings', 'main')
+const counterRef = (key) => doc(db, 'companies', getCompanyId(), 'counters', key)
 
 export const INVOICE_LABELS = [
   ['fatura', 'FATURË'],
@@ -142,7 +142,10 @@ export async function ensureCompanyInitialized(actorName) {
   const batch = writeBatch(db)
   let changed = false
   if (!(await getDoc(settingsRef())).exists()) {
-    batch.set(settingsRef(), { ...DEFAULT_SETTINGS, krijuar: serverTimestamp() })
+    // Kompanitë e reja marrin emrin e tyre (nga companies/{id}); INTAL mbetet me parazgjedhjet.
+    const company = getCompanyId() === LEGACY_COMPANY_ID ? null : (await getDoc(doc(db, 'companies', getCompanyId()))).data()
+    const kompania = company ? { ...DEFAULT_SETTINGS.kompania, emri: company.emri, instagram: '' } : DEFAULT_SETTINGS.kompania
+    batch.set(settingsRef(), { ...DEFAULT_SETTINGS, kompania, krijuar: serverTimestamp() })
     changed = true
   }
   for (const key of Object.keys(COUNTER_KEYS)) {

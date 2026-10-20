@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { ShieldCheck } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useSettings } from '../hooks/useSettings'
 import { ROLES, modulesFor } from '../config/roles'
@@ -11,7 +12,7 @@ export function initials(name = '') {
 }
 
 export default function Sidebar() {
-  const { profile, role, perms } = useAuth()
+  const { profile, role, perms, isSuperAdmin } = useAuth()
   const { settings } = useSettings()
   const modules = modulesFor(perms)
   const primary = modules.find((m) => m.primary)
@@ -46,6 +47,12 @@ export default function Sidebar() {
             <span>{m.label}</span>
           </NavLink>
         ))}
+        {isSuperAdmin && (
+          <NavLink to="/super-admin" className="nav-item">
+            <span className="nav-icon"><ShieldCheck size={18} /></span>
+            <span>Super-Admin</span>
+          </NavLink>
+        )}
       </nav>
 
       <NavLink to="/profili" className="profile">

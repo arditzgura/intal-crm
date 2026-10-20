@@ -26,6 +26,10 @@ import FinancePage from './pages/finance/FinancePage'
 import ReportsPage from './pages/reports/ReportsPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import { errorMessage } from './services/authService'
+import { ensureCompanyInitialized } from './services/settingsService'
+import VerifyEmailPage from './pages/VerifyEmailPage'
+import SuperAdminPage from './pages/SuperAdminPage'
+import { useEffect } from 'react'
 
 const PAGES = {
   cilesimet: SettingsPage,
@@ -42,11 +46,17 @@ const PAGES = {
 }
 
 export default function App() {
-  const { status, perms, error } = useAuth()
+  const { status, perms, error, profile, isSuperAdmin } = useAuth()
+
+  // Kompania e re: cilësimet dhe numëruesit krijohen herën e parë që hyn Admini (pas verifikimit).
+  useEffect(() => {
+    if (status === 'ready' && profile?.roli === 'admin') ensureCompanyInitialized(profile.emri).catch((err) => console.warn(err))
+  }, [status, profile?.roli, profile?.emri])
 
   if (status === 'loading') return <StatusScreen loading title="Duke u ngarkuar…" />
   if (status === 'signedOut') return <LoginPage />
   if (status === 'needsSetup') return <SetupPage />
+  if (status === 'verifyEmail') return <VerifyEmailPage />
   if (status === 'noAccess')
     return (
       <StatusScreen
@@ -135,6 +145,7 @@ export default function App() {
             }
           />
           <Route path="/profili" element={<ProfilePage />} />
+          {isSuperAdmin && <Route path="/super-admin" element={<SuperAdminPage />} />}
           <Route path="*" element={<Navigate to={homePathFor(perms)} replace />} />
         </Route>
       </Routes>

@@ -990,3 +990,34 @@ th.sortable.sorted .sort-icon { opacity: 1; }
 .ni-client-row .picker input { padding-top: 18px; padding-bottom: 18px; }
 .ni-client-row .picker-row > .btn { align-self: stretch; }
 .ni-client-row .ni-contact { padding-top: 17px; padding-bottom: 17px; }
+
+/* Hyrja (si modeli): kartë e errët, skedat Hyr / Krijo llogari */
+.auth-bg { background: #0f172a; min-height: 100vh; padding: 24px 16px; }
+.auth-wrap { width: 100%; max-width: 440px; }
+.auth-brand { text-align: center; color: #fff; margin-bottom: 18px; }
+.auth-brand h1 { margin: 10px 0 2px; font-size: 1.5rem; font-weight: 900; letter-spacing: 0.5px; }
+.auth-brand p { margin: 0; color: #94a3b8; font-size: 0.85rem; }
+.auth-brand .brand-mark { margin: 0 auto; }
+.auth-card { background: #1e293b; border: 1px solid #334155; border-radius: 22px; padding: 26px 24px 22px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35); }
+.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #334155; border-radius: 14px; padding: 5px; margin-bottom: 22px; }
+.auth-tabs button { display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 10px; padding: 11px 8px; background: transparent; color: #94a3b8; font: inherit; font-weight: 900; font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; }
+.auth-tabs button.active { background: #fff; color: #0f172a; }
+.auth-field { display: block; margin-bottom: 16px; }
+.auth-field > span { display: block; font-size: 0.72rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #94a3b8; margin-bottom: 7px; }
+.auth-field input { width: 100%; background: #334155; border: 1px solid #475569; color: #f1f5f9; border-radius: 14px; padding: 14px 16px; font-size: 1rem; }
+.auth-field input::placeholder { color: #64748b; }
+.auth-field input:focus { outline: none; border-color: #e11d48; box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.25); }
+.auth-field .password-eye { color: #94a3b8; }
+.auth-field .password-eye:hover { background: #475569; color: #fff; }
+.auth-submit { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; border: 0; border-radius: 14px; padding: 15px; background: #e11d48; color: #fff; font: inherit; font-weight: 900; font-size: 1rem; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; box-shadow: 0 10px 22px rgba(225, 29, 72, 0.3); margin-top: 4px; }
+.auth-submit:hover:not(:disabled) { background: #be123c; }
+.auth-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+.auth-link { display: block; margin: 14px auto 0; background: none; border: 0; color: #94a3b8; font: inherit; font-size: 0.85rem; cursor: pointer; text-decoration: underline; }
+.auth-link:hover { color: #fff; }
+.auth-note { color: #94a3b8; font-size: 0.82rem; margin: 0 0 16px; }
+.auth-card .alert { font-size: 0.85rem; }
+
+.verify-card { text-align: center; color: #e2e8f0; }
+.verify-card h2 { margin: 6px 0 8px; color: #fff; }
+.verify-card p { color: #94a3b8; font-size: 0.9rem; }
+.verify-icon { color: #e11d48; }

@@ -17,8 +17,14 @@ service cloud.firestore {
       return signedIn()
         && exists(userPath(request.auth.uid))
         && me().companyId == companyId
-        && me().aktiv == true;
+        && me().aktiv == true
+        // Admini i një kompanie të re duhet të ketë verifikuar email-in
+        && (me().get('duhetVerifikim', false) == false || request.auth.token.email_verified == true);
     }
+    // Pronari i aplikacionit (njësoj si SUPER_ADMIN_EMAIL te src/firebase/index.js)
+    function superAdmin() { return signedIn() && request.auth.token.email == 'arditzgura@gmail.com'; }
+    function companyDocPath(companyId) { return /databases/$(database)/documents/companies/$(companyId); }
+    function invitePath(code) { return /databases/$(database)/documents/inviteCodes/$(code); }
     function hasRole(companyId, roles) { return isMember(companyId) && me().roli in roles; }
     function isAdmin(companyId) { return hasRole(companyId, ['admin']); }
 
@@ -290,7 +296,7 @@ service cloud.firestore {
 
     function validRole(r) { return r in ['admin', 'shites', 'finance', 'magazinier', 'personalizuar']; }
     function validUserDoc(d) {
-      return d.keys().hasOnly(['companyId', 'roli', 'lejet', 'emri', 'email', 'aktiv', 'krijuar'])
+      return d.keys().hasOnly(['companyId', 'roli', 'lejet', 'emri', 'email', 'aktiv', 'krijuar', 'username', 'duhetVerifikim'])
         && (!('lejet' in d) || d.lejet is list)
         && d.companyId is string
         && validRole(d.roli)
@@ -334,22 +340,76 @@ service cloud.firestore {
         (
           request.auth.uid != uid
           && isAdmin(request.resource.data.companyId)
+          && request.resource.data.get('duhetVerifikim', false) == false
+        )
+        ||
+        // (c) "Krijo llogari": Admini i një kompanie të re, në të njëjtin batch me kompaninë (me kod ftese)
+        (
+          request.auth.uid == uid
+          && request.resource.data.roli == 'admin'
+          && request.resource.data.aktiv == true
+          && request.resource.data.duhetVerifikim == true
+          && !exists(companyDocPath(request.resource.data.companyId))
+          && getAfter(companyDocPath(request.resource.data.companyId)).data.ownerUid == uid
         )
       );
 
       // Vetëm Admini ndryshon përdoruesit e tjerë; askush nuk ndryshon veten
       // (pra askush nuk mund t'i japë vetes rol tjetër).
-      allow update: if request.auth.uid != uid
+      allow update: if (request.auth.uid != uid
         && isAdmin(resource.data.companyId)
         && validUserDoc(request.resource.data)
         && request.resource.data.companyId == resource.data.companyId
-        && request.resource.data.email == resource.data.email;
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.get('duhetVerifikim', false) == resource.data.get('duhetVerifikim', false))
+        // Secili mund të ndryshojë vetëm emrin e vet të hyrjes
+        || (request.auth.uid == uid && isMember(resource.data.companyId) && changedKeys().hasOnly(['username']));
 
       allow delete: if false;
     }
 
+    // ---------- Kodet e ftesës (Super-Admini i krijon; "Krijo llogari" përdor një) ----------
+    match /inviteCodes/{code} {
+      allow get: if true; // kontrolli i kodit para regjistrimit (kodi është i rastësishëm)
+      allow list, create, delete: if superAdmin();
+      allow update: if superAdmin() || (
+        signedIn()
+        && resource.data.aktiv == true && resource.data.usedBy == null
+        && changedKeys().hasOnly(['usedBy', 'companyId', 'perdorur'])
+        && request.resource.data.usedBy == request.auth.uid
+        && getAfter(companyDocPath(request.resource.data.companyId)).data.ownerUid == request.auth.uid
+      );
+    }
+
+    // ---------- Emrat e përdoruesve (hyrja me emër → email) ----------
+    match /usernames/{name} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if name.matches('^[a-z0-9._-]{3,30}$')
+        && getAfter(userPath(request.resource.data.uid)).data.username == name
+        && getAfter(userPath(request.resource.data.uid)).data.companyId == request.resource.data.companyId
+        && getAfter(userPath(request.resource.data.uid)).data.email == request.resource.data.email
+        && (request.resource.data.uid == request.auth.uid || isAdmin(request.resource.data.companyId));
+      allow delete: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin(resource.data.companyId));
+      allow update: if false;
+    }
+
     // ---------- Të dhënat e kompanisë ----------
     match /companies/{companyId} {
+      // Dokumenti i kompanisë: krijohet nga "Krijo llogari" me një kod ftese të papërdorur.
+      allow read: if isMember(companyId) || superAdmin();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['emri', 'ownerUid', 'ownerEmail', 'ownerEmri', 'kodiFtese', 'aktiv', 'krijuar'])
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.aktiv == true
+        && request.resource.data.emri is string && request.resource.data.emri.size() > 0
+        && getAfter(userPath(request.auth.uid)).data.companyId == companyId
+        && get(invitePath(request.resource.data.kodiFtese)).data.aktiv == true
+        && get(invitePath(request.resource.data.kodiFtese)).data.usedBy == null
+        && getAfter(invitePath(request.resource.data.kodiFtese)).data.usedBy == request.auth.uid
+        && getAfter(invitePath(request.resource.data.kodiFtese)).data.companyId == companyId;
+      allow update: if (isAdmin(companyId) && changedKeys().hasOnly(['emri'])) || superAdmin();
+      allow delete: if false;
 
       match /settings/{docId} {
         allow read: if isMember(companyId);

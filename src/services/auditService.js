@@ -1,5 +1,5 @@
 import { collection, doc, serverTimestamp } from 'firebase/firestore'
-import { auth, db, COMPANY_ID } from '../firebase'
+import { auth, db, getCompanyId } from '../firebase'
 
 /**
  * Ndërton hyrjen e auditLog-ut. Shkruhet brenda të njëjtit batch/transaction
@@ -7,7 +7,7 @@ import { auth, db, COMPANY_ID } from '../firebase'
  *   writer.set(ref, data)
  */
 export function auditEntry({ action, entity, entityId = null, details = {}, actorName = '' }) {
-  const ref = doc(collection(db, 'companies', COMPANY_ID, 'auditLog'))
+  const ref = doc(collection(db, 'companies', getCompanyId(), 'auditLog'))
   const data = {
     action,
     entity,

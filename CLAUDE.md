@@ -3,7 +3,7 @@
 Specifikimi i plotë: [SPEC.md](SPEC.md). Lexoje para çdo faze; ky skedar përmbledh vetëm rregullat që nuk shkelen kurrë.
 
 ## Stack
-React + Vite, HashRouter, Firebase (vetëm Auth email/fjalëkalim + Firestore). Hosting në GitHub Pages me deploy automatik nga `main`.
+React + Vite, HashRouter, Firebase (Auth email/fjalëkalim + Firestore). Hosting në GitHub Pages me deploy automatik nga `main`.
 
 ## Rregulla kryesore
 - **Ndërfaqja tërësisht në shqip** (tekste, mesazhe gabimi, emra rubrikash).
@@ -63,6 +63,13 @@ React + Vite, HashRouter, Firebase (vetëm Auth email/fjalëkalim + Firestore). 
 - `services/dashboardService.js`: borxhi/detyrimet me sum/count nga serveri; statistikat e rënda (grafiku, top artikujt, vlera e stokut, fitimi) te `stats/paneli` + `stats/paneliKosto` (vetëm `sheh_koston`), rillogaritur pas 6 orësh ose me "Rifresko".
 - `snapshots/{YYYY-MM}`: stoku dhe borxhi në fund të muajit, krijohet një herë (rules: vetëm create). Mos shto listener-a mbi koleksione të plota te Paneli.
 - Agregimet: një kërkesë për çdo fushë (`aggregate()` te invoiceService) – Firestore kërkon indeks për çdo kombinim fushash të mbledhura.
+
+## Shumë kompani (Faza 7A)
+- Kompania aktive = `users/{uid}.companyId`, vendoset me `setCompanyId()` te `useAuth` (src/firebase). Mos përdor ID të fiksuar; `LEGACY_COMPANY_ID` ('intal') vetëm për konfigurimin e vjetër `meta/bootstrap`.
+- "Krijo llogari" (`services/companyService.registerCompany`): kod ftese `inviteCodes/{KODI}` (një përdorim) → `companies/{id}` + Admini (`duhetVerifikim: true`) + kodi i shënuar, në një batch; email verifikimi i Firebase. Rules: `isMember` kërkon `email_verified` kur `duhetVerifikim`.
+- Hyrja me email ose emër përdoruesi: `usernames/{emri}` → { email, uid, companyId } (lexim publik vetëm me `get`).
+- Super-Admin = `SUPER_ADMIN_EMAIL` (src/firebase) ↔ `superAdmin()` te rules: sheh `companies` dhe krijon kodet e ftesës (`/super-admin`).
+- Auth: email/fjalëkalim (anonim vetëm për demon e Fazës 7B, kur të ndërtohet).
 
 ## Siguria e repo-s
 `data/`, `firebase-config*.txt`, `.env` nuk shkojnë kurrë në git. Konfigurimi i Firebase vjen nga `VITE_FIREBASE_*` (lokalisht `.env`, në CI GitHub Secrets).

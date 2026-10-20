@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
-import { auth, COMPANY_ID } from '../firebase'
+import { auth, setCompanyId, SUPER_ADMIN_EMAIL } from '../firebase'
 import { watchUserProfile, isBootstrapped } from '../services/userService'
 import { permissionsOf } from '../config/permissions'
 
@@ -13,6 +13,7 @@ const AuthContext = createContext(null)
  *  'needsSetup' – i loguar, pa profil dhe ende pa asnjë Admin → Konfigurimi fillestar
  *  'noAccess'   – i loguar, pa profil (ose profil i kompanisë tjetër)
  *  'inactive'   – profili është çaktivizuar
+ *  'verifyEmail'– Admini i një kompanie të re ende nuk ka verifikuar email-in
  *  'ready'      – gjithçka në rregull
  *  'error'
  */
@@ -42,6 +43,12 @@ export function AuthProvider({ children }) {
         if (cancelled) return
         setProfile(p)
         if (!p) {
+          // Llogari e sapokrijuar ("Krijo llogari"): profili po shkruhet – prit pa shfaqur "Pa akses".
+          const created = Date.parse(auth.currentUser?.metadata?.creationTime ?? '')
+          if (created && Date.now() - created < 60000) {
+            setStatus('loading')
+            return
+          }
           try {
             const done = await isBootstrapped()
             if (!cancelled) setStatus(done ? 'noAccess' : 'needsSetup')
@@ -51,11 +58,16 @@ export function AuthProvider({ children }) {
               setStatus('error')
             }
           }
-        } else if (p.companyId !== COMPANY_ID) {
+        } else if (!p.companyId) {
           setStatus('noAccess')
         } else if (!p.aktiv) {
           setStatus('inactive')
+        } else if (p.duhetVerifikim && !auth.currentUser?.emailVerified) {
+          setCompanyId(p.companyId)
+          setStatus('verifyEmail')
         } else {
+          // Të gjitha leximet/shkrimet shkojnë te kompania e përdoruesit.
+          setCompanyId(p.companyId)
           setStatus('ready')
         }
       },
@@ -73,9 +85,10 @@ export function AuthProvider({ children }) {
 
   const reload = useCallback(() => setReloadKey((k) => k + 1), [])
   const perms = useMemo(() => permissionsOf(profile), [profile])
+  const isSuperAdmin = user?.email?.toLowerCase() === SUPER_ADMIN_EMAIL
 
   return (
-    <AuthContext.Provider value={{ user, profile, status, error, reload, role: profile?.roli, perms }}>
+    <AuthContext.Provider value={{ user, profile, status, error, reload, role: profile?.roli, perms, isSuperAdmin }}>
       {children}
     </AuthContext.Provider>
   )

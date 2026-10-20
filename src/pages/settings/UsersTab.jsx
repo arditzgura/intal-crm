@@ -2,12 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { ROLES } from '../../config/roles'
 import { TEMPLATES, permissionsOf } from '../../config/permissions'
-import { createCompanyUser, listCompanyUsers, updateCompanyUser } from '../../services/userService'
+import { createCompanyUser, listCompanyUsers, updateCompanyUser, setUsername } from '../../services/userService'
 import { errorMessage } from '../../services/authService'
 import Modal from '../../components/Modal'
 import PermissionsEditor from './PermissionsEditor'
 
-const EMPTY = { emri: '', email: '', password: '', roli: 'shites', lejet: [...TEMPLATES.shites.lejet] }
+const EMPTY = { emri: '', email: '', username: '', password: '', roli: 'shites', lejet: [...TEMPLATES.shites.lejet] }
 
 export default function UsersTab() {
   const { user: me, profile } = useAuth()
@@ -40,13 +40,25 @@ export default function UsersTab() {
     setBusy(true)
     try {
       await createCompanyUser(form, profile?.emri)
-      setMsg({ type: 'success', text: `Përdoruesi ${form.emri} u krijua. Jepini email-in dhe fjalëkalimin.` })
+      setMsg({ type: 'success', text: `Përdoruesi ${form.emri} u krijua. Hyn me ${form.username ? `emrin "${form.username.trim().toLowerCase()}" ose ` : ''}email-in dhe fjalëkalimin.` })
       setForm(EMPTY)
       await load()
     } catch (err) {
-      setMsg({ type: 'error', text: errorMessage(err) })
+      setMsg({ type: 'error', text: err.code ? errorMessage(err) : err.message })
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function renameUser(u) {
+    const next = window.prompt(`Emri i përdoruesit për ${u.emri} (bosh = hiqe):`, u.username ?? '')
+    if (next == null) return
+    setMsg(null)
+    try {
+      await setUsername(u, next, profile?.emri)
+      await load()
+    } catch (err) {
+      setMsg({ type: 'error', text: err.code ? errorMessage(err) : err.message })
     }
   }
 
@@ -75,6 +87,7 @@ export default function UsersTab() {
                 <tr>
                   <th>Emri</th>
                   <th>Email</th>
+                  <th>Emri i përdoruesit</th>
                   <th>Roli / lejet</th>
                   <th>Statusi</th>
                 </tr>
@@ -87,6 +100,11 @@ export default function UsersTab() {
                     <tr key={u.uid}>
                       <td>{u.emri}{self && <span className="muted small"> (ju)</span>}</td>
                       <td>{u.email}</td>
+                      <td>
+                        <button type="button" className="btn link small" onClick={() => renameUser(u)} title="Vendos / ndrysho emrin e hyrjes">
+                          {u.username || <span className="muted">+ vendos</span>}
+                        </button>
+                      </td>
                       <td>
                         {self ? (
                           <span>{ROLES[u.roli]}</span>
@@ -132,6 +150,10 @@ export default function UsersTab() {
           <label className="field">
             <span>Email</span>
             <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+          </label>
+          <label className="field">
+            <span>Emri i përdoruesit (për hyrje, opsional)</span>
+            <input placeholder="p.sh. arditzgura" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
           </label>
           <label className="field">
             <span>Fjalëkalimi fillestar</span>
