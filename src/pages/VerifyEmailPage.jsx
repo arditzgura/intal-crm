@@ -33,16 +33,16 @@ export default function VerifyEmailPage() {
   }
 
   return (
-    <div className="center-screen auth-bg">
-      <div className="auth-wrap">
-        <div className="auth-card verify-card">
+    <div className="center-screen login-bg">
+      <div>
+        <div className="card narrow verify-card">
           <MailCheck size={44} className="verify-icon" />
           <h2>Verifikoni email-in</h2>
           <p>Ju dërguam një email te <b>{user?.email}</b>. Hapni lidhjen brenda tij (shikoni edhe te Spam), pastaj klikoni më poshtë.</p>
           {msg && <div className={`alert ${msg.type}`}>{msg.text}</div>}
-          <button type="button" className="auth-submit" onClick={onCheck} disabled={busy}>{busy ? 'Duke kontrolluar…' : 'E verifikova'}</button>
-          <button type="button" className="auth-link" onClick={onResend}>Ridërgo email-in</button>
-          <button type="button" className="auth-link" onClick={logout}>Dil</button>
+          <button type="button" className="btn primary block" onClick={onCheck} disabled={busy}>{busy ? 'Duke kontrolluar…' : 'E verifikova'}</button>
+          <button type="button" className="btn link block" onClick={onResend}>Ridërgo email-in</button>
+          <button type="button" className="btn link block" onClick={logout}>Dil</button>
         </div>
       </div>
     </div>

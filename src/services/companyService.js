@@ -22,11 +22,12 @@ export async function checkInvite(code) {
  * Regjistron një kompani të re: llogaria (email + fjalëkalim), kompania, Admini i saj
  * dhe shënimi i kodit të ftesës si i përdorur – në një batch. Dërgon email-in e verifikimit.
  */
-export async function registerCompany({ code, kompania, emri, email, password, username }) {
+export async function registerCompany({ code, kompania = '', emri = '', email, password, username = '' }) {
   const kodi = normalizeCode(code)
   const user = normalizeUsername(username)
-  if (!kompania.trim()) throw new Error('Shkruani emrin e kompanisë.')
-  if (!emri.trim()) throw new Error('Shkruani emrin tuaj.')
+  // Emri i kompanisë dhe i Adminit mund të plotësohen më vonë te Cilësimet.
+  kompania = kompania.trim() || 'Kompania ime'
+  emri = emri.trim() || email.trim().split('@')[0]
   if (user && !validUsername(user)) throw new Error('Emri i përdoruesit: 3–30 shkronja të vogla, shifra ose . _ -')
   await checkInvite(kodi)
   if (user && (await getDoc(doc(db, 'usernames', user))).exists()) throw new Error('Ky emër përdoruesi është i zënë.')
