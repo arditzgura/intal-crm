@@ -986,3 +986,7 @@ th.sortable.sorted .sort-icon { opacity: 1; }
 /* Detyrimi dhe dy butonat: −0.5 cm në lartësi (≈ −9.5 px sipër dhe poshtë) */
 .ni-calc .ni-final { padding-top: 25px; padding-bottom: 25px; }
 .ni-calc .ni-btn { padding-top: 23px; padding-bottom: 23px; }
+/* Klienti dhe Kontakti: +0.5 cm në lartësi */
+.ni-client-row .picker input { padding-top: 18px; padding-bottom: 18px; }
+.ni-client-row .picker-row > .btn { align-self: stretch; }
+.ni-client-row .ni-contact { padding-top: 17px; padding-bottom: 17px; }
