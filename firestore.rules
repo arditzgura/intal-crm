@@ -296,7 +296,7 @@ service cloud.firestore {
 
     function validRole(r) { return r in ['admin', 'shites', 'finance', 'magazinier', 'personalizuar']; }
     function validUserDoc(d) {
-      return d.keys().hasOnly(['companyId', 'roli', 'lejet', 'emri', 'emriPare', 'mbiemri', 'email', 'aktiv', 'krijuar', 'username', 'duhetVerifikim'])
+      return d.keys().hasOnly(['companyId', 'roli', 'roliEmer', 'lejet', 'emri', 'emriPare', 'mbiemri', 'email', 'aktiv', 'krijuar', 'username', 'duhetVerifikim'])
         && (!('lejet' in d) || d.lejet is list)
         && d.companyId is string
         && validRole(d.roli)

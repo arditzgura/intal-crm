@@ -74,7 +74,7 @@ export async function listCompanyUsers() {
  * Admini krijon një përdorues të ri. Llogaria e Auth krijohet me një instancë
  * të dytë të Firebase, që Admini të mos dalë nga llogaria e vet.
  */
-export async function createCompanyUser({ emri, email, password, roli, lejet, username }, actorName) {
+export async function createCompanyUser({ emri, email, password, roli, roliEmer, lejet, username }, actorName) {
   const user = normalizeUsername(username)
   if (user && !validUsername(user)) throw new Error('Emri i përdoruesit: 3–30 shkronja të vogla, shifra ose . _ -')
   if (user && (await getDoc(doc(db, 'usernames', user))).exists()) throw new Error('Ky emër përdoruesi është i zënë.')
@@ -88,6 +88,7 @@ export async function createCompanyUser({ emri, email, password, roli, lejet, us
     batch.set(doc(db, 'users', cred.user.uid), {
       companyId: getCompanyId(),
       roli,
+      ...(roli !== 'admin' && roliEmer?.trim() ? { roliEmer: roliEmer.trim() } : {}),
       lejet: roli === 'admin' ? [] : lejet,
       emri: emri.trim(),
       email: email.trim(),

@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import PasswordInput from '../components/PasswordInput'
 import { useAuth } from '../hooks/useAuth'
-import { ROLES } from '../config/roles'
+import { roleLabel } from '../config/roles'
 import { changePassword, errorMessage, logout } from '../services/authService'
 import { updateOwnProfile } from '../services/userService'
 import { initials } from '../components/Sidebar'
 
 export default function ProfilePage() {
-  const { profile, role } = useAuth()
+  const { profile } = useAuth()
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -41,7 +41,7 @@ export default function ProfilePage() {
         <div>
           <h2>{profile?.emri}</h2>
           <div className="muted">{profile?.email}</div>
-          <span className="badge">{ROLES[role]}</span>
+          <span className="badge">{roleLabel(profile)}</span>
         </div>
       </div>
 

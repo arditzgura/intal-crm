@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { ShieldCheck } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useSettings } from '../hooks/useSettings'
-import { ROLES, modulesFor } from '../config/roles'
+import { roleLabel, modulesFor } from '../config/roles'
 import Icon from './Icon'
 
 export function initials(name = '') {
@@ -12,7 +12,7 @@ export function initials(name = '') {
 }
 
 export default function Sidebar() {
-  const { profile, role, perms, isSuperAdmin } = useAuth()
+  const { profile, perms, isSuperAdmin } = useAuth()
   const { settings } = useSettings()
   const modules = modulesFor(perms)
   const primary = modules.find((m) => m.primary)
@@ -59,7 +59,7 @@ export default function Sidebar() {
         <div className="avatar">{initials(profile?.emri)}</div>
         <div className="profile-text">
           <div className="profile-name">{profile?.emri}</div>
-          <div className="profile-role">{ROLES[role]}</div>
+          <div className="profile-role">{roleLabel(profile)}</div>
         </div>
       </NavLink>
     </aside>

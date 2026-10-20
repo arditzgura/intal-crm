@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
-import { ROLES } from '../../config/roles'
+import { roleLabel } from '../../config/roles'
 import { TEMPLATES, permissionsOf } from '../../config/permissions'
 import { createCompanyUser, listCompanyUsers, updateCompanyUser, setUsername } from '../../services/userService'
 import { errorMessage } from '../../services/authService'
 import Modal from '../../components/Modal'
 import PermissionsEditor from './PermissionsEditor'
 
-const EMPTY = { emri: '', email: '', username: '', password: '', roli: 'shites', lejet: [...TEMPLATES.shites.lejet] }
+const EMPTY = { emri: '', email: '', username: '', password: '', roli: 'shites', roliEmer: null, lejet: [...TEMPLATES.shites.lejet] }
 
 export default function UsersTab() {
   const { user: me, profile } = useAuth()
@@ -17,6 +17,9 @@ export default function UsersTab() {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
   const [editing, setEditing] = useState(null)
+
+  // Rolet e riemërtuara që përdoren tashmë (emri → lejet), për t'i zgjedhur sërish
+  const customRoles = Object.fromEntries(users.filter((u) => u.roliEmer).map((u) => [u.roliEmer, u.lejet ?? []]))
 
   const load = useCallback(async () => {
     try {
@@ -37,6 +40,7 @@ export default function UsersTab() {
     setMsg(null)
     if (form.password.length < 6) return setMsg({ type: 'error', text: 'Fjalëkalimi duhet të ketë të paktën 6 karaktere.' })
     if (form.roli !== 'admin' && !form.lejet.length) return setMsg({ type: 'error', text: 'Zgjidhni të paktën një leje.' })
+    if (form.roliEmer != null && !form.roliEmer.trim()) return setMsg({ type: 'error', text: 'Shkruani emrin e rolit.' })
     setBusy(true)
     try {
       await createCompanyUser(form, profile?.emri)
@@ -107,10 +111,10 @@ export default function UsersTab() {
                       </td>
                       <td>
                         {self ? (
-                          <span>{ROLES[u.roli]}</span>
+                          <span>{roleLabel(u)}</span>
                         ) : (
                           <button type="button" className="btn small" onClick={() => setEditing(u)}>
-                            {ROLES[u.roli] ?? u.roli} · {count} leje – Ndrysho
+                            {roleLabel(u)} · {count} leje – Ndrysho
                           </button>
                         )}
                       </td>
@@ -160,7 +164,7 @@ export default function UsersTab() {
             <input type="text" autoComplete="off" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
           </label>
         </div>
-        <PermissionsEditor value={form} onChange={(v) => setForm({ ...form, ...v })} />
+        <PermissionsEditor value={form} onChange={(v) => setForm({ ...form, ...v })} customRoles={customRoles} />
         {msg && <div className={`alert ${msg.type}`}>{msg.text}</div>}
         <button className="btn primary" disabled={busy}>
           {busy ? 'Duke krijuar…' : 'Krijo përdoruesin'}
@@ -171,6 +175,7 @@ export default function UsersTab() {
         <EditPermissionsModal
           user={editing}
           onClose={() => setEditing(null)}
+          customRoles={customRoles}
           onSave={async (v) => (await change(editing, v)) && setEditing(null)}
         />
       )}
@@ -178,21 +183,22 @@ export default function UsersTab() {
   )
 }
 
-function EditPermissionsModal({ user, onClose, onSave }) {
-  const [value, setValue] = useState({ roli: user.roli, lejet: [...permissionsOf(user)].filter((p) => p !== 'admin') })
+function EditPermissionsModal({ user, onClose, onSave, customRoles }) {
+  const [value, setValue] = useState({ roli: user.roli, roliEmer: user.roliEmer ?? null, lejet: [...permissionsOf(user)].filter((p) => p !== 'admin') })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
   async function save() {
     if (value.roli !== 'admin' && !value.lejet.length) return setError('Zgjidhni të paktën një leje.')
+    if (value.roliEmer != null && !value.roliEmer.trim()) return setError('Shkruani emrin e rolit.')
     setBusy(true)
-    await onSave({ roli: value.roli, lejet: value.roli === 'admin' ? [] : value.lejet })
+    await onSave({ roli: value.roli, roliEmer: value.roliEmer?.trim() || null, lejet: value.roli === 'admin' ? [] : value.lejet })
     setBusy(false)
   }
 
   return (
     <Modal title={`Lejet – ${user.emri}`} onClose={onClose} wide>
-      <PermissionsEditor value={value} onChange={setValue} />
+      <PermissionsEditor value={value} onChange={setValue} customRoles={customRoles} />
       {error && <div className="alert error">{error}</div>}
       <p className="muted small">Ndryshimet vlejnë menjëherë, edhe nëse përdoruesi është i loguar.</p>
       <div className="modal-actions">

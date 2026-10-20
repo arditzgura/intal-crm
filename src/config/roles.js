@@ -8,6 +8,9 @@ export const ROLES = {
   ...Object.fromEntries(Object.entries(TEMPLATES).map(([k, t]) => [k, t.label])),
 }
 
+/** Emri i rolit që shfaqet: roli i riemërtuar ("Tjetër +", p.sh. Kontabilist) ose shablloni. */
+export const roleLabel = (u) => u?.roliEmer || ROLES[u?.roli] || u?.roli || ''
+
 // `perm` = leja që e shfaq rubrikën; `phase` = faza e SPEC.md ku ndërtohet.
 export const MODULES = [
   { key: 'fature-e-re', label: 'Faturë e Re', icon: 'FilePlus2', perm: 'mod_fature_e_re', phase: 3, primary: true },
