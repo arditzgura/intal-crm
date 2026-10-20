@@ -529,8 +529,8 @@ h3.pad { padding: 14px 14px 0; }
 .ni-cur { display: inline-flex; background: #f1f5f9; border-radius: 8px; padding: 3px; gap: 2px; }
 .ni-cur button { font: inherit; border: none; background: none; padding: 5px 9px; border-radius: 6px; font-size: 0.72rem; font-weight: 800; cursor: pointer; color: var(--muted); }
 .ni-cur button.active { background: #0f172a; color: #fff; }
-.ni-number { background: #0f172a; color: #fff; border-radius: 10px; padding: 9px 16px; min-width: 130px; text-align: right; font-weight: 800; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
-.ni-number span { color: #64748b; float: left; margin-right: 12px; }
+.ni-number { color: #0f172a; text-align: right; font-weight: 800; font-size: 1.05rem; font-variant-numeric: tabular-nums; padding: 9px 0; }
+.ni-number span { color: #0f172a; margin-right: 2px; }
 .ni-rate { font-size: 0.8rem; color: var(--muted); display: flex; align-items: center; gap: 6px; }
 .ni-rate input { width: 90px; padding: 5px 8px; }
 .ni-client-row { display: grid; grid-template-columns: 1fr 1fr 230px; gap: 16px; margin-bottom: 20px; align-items: start; }
