@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { getDoc } from 'firebase/firestore'
-import { Trash2, UserPlus, Save, CheckCircle2, CheckCheck, FileText, AlertTriangle, RotateCcw, Pencil, Clock, Plus, MessageSquareText, Calculator, Wallet, Scale, ArrowLeft, X } from 'lucide-react'
+import { Trash2, UserPlus, CheckCircle2, CheckCheck, FileText, AlertTriangle, RotateCcw, Pencil, Clock, Plus, MessageSquareText, Calculator, Wallet, Scale, ArrowLeft, X } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import InvoicePreview from '../../components/invoice/InvoicePreview'
 import { useLive } from '../../hooks/useLive'
 import { useSettings } from '../../hooks/useSettings'
 import { watchClients } from '../../services/clientService'
 import { watchItems, watchPricesForClient } from '../../services/itemService'
-import { saveDraft, deleteDraft, issueInvoice, editInvoice, paymentsOfInvoice, watchDrafts, watchNextInvoiceNumber } from '../../services/invoiceService'
+import { issueInvoice, editInvoice, paymentsOfInvoice, watchNextInvoiceNumber } from '../../services/invoiceService'
 import { formatDocNumber } from '../../services/settingsService'
 import { watchStock } from '../../services/stockService'
 import { companyDoc } from '../../services/paths'
@@ -131,7 +131,6 @@ function InvoiceEditor({ urlBound, onTitle, onIssued }) {
 
   const { data: clients } = useLive(watchClients, [], { initial: [] })
   const { data: items } = useLive(watchItems, [], { initial: [] })
-  const { data: drafts } = useLive(watchDrafts, [], { initial: [] })
   const { data: stock } = useLive(watchStock, [], { initial: {} })
   const { data: nextNumber } = useLive(watchNextInvoiceNumber, [], { initial: null })
 
@@ -150,7 +149,6 @@ function InvoiceEditor({ urlBound, onTitle, onIssued }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
-  const [showDrafts, setShowDrafts] = useState(false)
   // Navigimi me tastierë: refs për fushat e çdo rreshti dhe fusha që merr fokusin
   const fieldRefs = useRef({})
   const [focusTarget, setFocusTarget] = useState(null) // { key, field: 'qty' | 'item' }
@@ -343,24 +341,6 @@ function InvoiceEditor({ urlBound, onTitle, onIssued }) {
     return ''
   }
 
-  async function onSaveDraft() {
-    setError('')
-    setInfo('')
-    const v = validate(false)
-    if (v) return setError(v)
-    setBusy(true)
-    try {
-      const id = await saveDraft(draftId, payload(), profile?.emri)
-      if (urlBound) setParams({ draft: id }, { replace: true })
-      else setOwnDraft(id)
-      setInfo('Drafti u ruajt.')
-    } catch (err) {
-      setError(err.code ? errorMessage(err) : err.message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
   /** Lëshon faturën; `paidFull` = paguhet i gjithë detyrimi (Ruaj si të paguar). */
   async function onIssue(paidFull) {
     setError('')
@@ -390,16 +370,6 @@ function InvoiceEditor({ urlBound, onTitle, onIssued }) {
     } catch (err) {
       setError(err.code ? errorMessage(err) : err.message)
       setBusy(false)
-    }
-  }
-
-  async function onDeleteDraft(id) {
-    if (!window.confirm('Të fshihet drafti?')) return
-    try {
-      await deleteDraft(id, profile?.emri)
-      if (id === draftId) resetForm()
-    } catch (err) {
-      setError(err.code ? errorMessage(err) : err.message)
     }
   }
 
@@ -591,35 +561,9 @@ function InvoiceEditor({ urlBound, onTitle, onIssued }) {
                 <button type="button" className="ni-btn green" onClick={() => onIssue(true)} disabled={busy}><CheckCheck size={18} /> Ruaj si të paguar</button>
               </>
             )}
-            {!orig && <button type="button" className="btn link ni-draft-link" onClick={onSaveDraft} disabled={busy}><Save size={14} /> Ruaj si draft (pa numër)</button>}
           </div>
         </div>
       </div>
-
-      {drafts.length > 0 && (
-        <div className="card">
-          <button type="button" className="btn link" onClick={() => setShowDrafts((s) => !s)}><FileText size={15} /> Draftet e ruajtura ({drafts.length}) {showDrafts ? '▲' : '▼'}</button>
-          {showDrafts && (
-            <div className="table-wrap">
-              <table className="table">
-                <tbody>
-                  {drafts.map((d) => (
-                    <tr key={d.id} className={d.id === draftId ? 'selected' : ''}>
-                      <td>{d.klient?.emri ?? <span className="muted">Pa klient</span>}</td>
-                      <td className="num">{formatMoney(d.totali, d.monedha)}</td>
-                      <td className="muted small">{formatDate(d.ndryshuar)} · {d.krijuarNga?.emri}</td>
-                      <td className="num">
-                        <Link className="btn small" to={`/fature-e-re?draft=${d.id}`}>Hap</Link>{' '}
-                        <button className="icon-btn danger-text" onClick={() => onDeleteDraft(d.id)} aria-label="Fshi draftin"><Trash2 size={16} /></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
 
       {creatingClient && <ClientFormModal onClose={() => setCreatingClient(false)} onSaved={(id) => pickClient(id)} />}
     </div>
