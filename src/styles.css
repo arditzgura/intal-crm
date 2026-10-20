@@ -975,3 +975,7 @@ th.sortable.sorted .sort-icon { opacity: 1; }
 .ni-final b { font-size: 1.5rem; }
 .ni-final-icon { display: none; }
 .ni-btn { border-radius: 10px; padding: 10px; font-size: 0.78rem; letter-spacing: 0.6px; box-shadow: none; }
+/* Llogaritja finale: fushat, detyrimi dhe butonat më të lartë (gjerësia e njëjtë) */
+.ni-box input { padding-top: 10px; padding-bottom: 10px; }
+.ni-final { padding-top: 16px; padding-bottom: 16px; }
+.ni-btn { padding-top: 14px; padding-bottom: 14px; }
