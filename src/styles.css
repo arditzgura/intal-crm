@@ -962,3 +962,16 @@ th.sortable.sorted .sort-icon { opacity: 1; }
 .ni-tabs { margin-bottom: -1px; padding-left: 18px; }
 .ni-tab.active { border-bottom: 1px solid #fff; }
 .ni-tabs ~ div > div > .ni-card { position: relative; z-index: 0; }
+
+/* Llogaritja finale: më e thjeshtë dhe 2 cm më e ngushtë (ngjyrat ruhen) */
+.ni-bottom { grid-template-columns: 1fr minmax(240px, 304px); }
+.ni-calc { border-radius: 12px; padding: 14px; gap: 8px; box-shadow: none; }
+.ni-calc .ni-section-title.pink { margin: 0 0 4px; }
+.ni-box { border-radius: 8px; padding: 8px 10px; gap: 4px; }
+.ni-box b { font-size: 0.95rem; }
+.ni-box input { padding: 6px 9px; font-size: 0.92rem; }
+.ni-calc label { font-size: 0.64rem; }
+.ni-final { border-radius: 10px; padding: 10px 14px; border-bottom-width: 3px; }
+.ni-final b { font-size: 1.5rem; }
+.ni-final-icon { display: none; }
+.ni-btn { border-radius: 10px; padding: 10px; font-size: 0.78rem; letter-spacing: 0.6px; box-shadow: none; }
