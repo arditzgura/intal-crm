@@ -983,3 +983,6 @@ th.sortable.sorted .sort-icon { opacity: 1; }
 .ni-calc .ni-box { padding-top: 27px; padding-bottom: 27px; }
 .ni-calc .ni-final { padding-top: 35px; padding-bottom: 35px; }
 .ni-calc .ni-btn { padding-top: 33px; padding-bottom: 33px; }
+/* Detyrimi dhe dy butonat: −0.5 cm në lartësi (≈ −9.5 px sipër dhe poshtë) */
+.ni-calc .ni-final { padding-top: 25px; padding-bottom: 25px; }
+.ni-calc .ni-btn { padding-top: 23px; padding-bottom: 23px; }
