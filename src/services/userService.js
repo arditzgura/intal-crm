@@ -136,3 +136,28 @@ export async function setUsername(u, username, actorName) {
   addAudit(batch, { action: 'emer_perdoruesi', entity: 'users', entityId: u.uid, details: { para: u.username ?? null, pas: next || null }, actorName })
   await batch.commit()
 }
+
+/**
+ * Përdoruesi plotëson të dhënat e veta: emri, mbiemri dhe emri i përdoruesit (unik, për hyrje
+ * dhe si titull që shohin të tjerët). `emri` = "Emri Mbiemri" (përdoret kudo në aplikacion).
+ */
+export async function updateOwnProfile(profile, { emriPare, mbiemri, username }) {
+  const uid = auth.currentUser.uid
+  const first = (emriPare ?? '').trim()
+  const last = (mbiemri ?? '').trim()
+  if (!first) throw new Error('Shkruani emrin.')
+  const next = normalizeUsername(username)
+  if (next && !validUsername(next)) throw new Error('Emri i përdoruesit: 3–30 shkronja të vogla, shifra ose . _ -')
+  const changedUser = next !== (profile.username ?? '')
+  if (changedUser && next && (await getDoc(doc(db, 'usernames', next))).exists()) throw new Error('Ky emër përdoruesi është i zënë.')
+  const batch = writeBatch(db)
+  if (changedUser && profile.username) batch.delete(doc(db, 'usernames', profile.username))
+  if (changedUser && next) batch.set(doc(db, 'usernames', next), { email: profile.email, uid, companyId: profile.companyId })
+  batch.update(doc(db, 'users', uid), {
+    emriPare: first,
+    mbiemri: last,
+    emri: [first, last].filter(Boolean).join(' '),
+    ...(changedUser ? { username: next || null } : {}),
+  })
+  await batch.commit()
+}

@@ -296,7 +296,7 @@ service cloud.firestore {
 
     function validRole(r) { return r in ['admin', 'shites', 'finance', 'magazinier', 'personalizuar']; }
     function validUserDoc(d) {
-      return d.keys().hasOnly(['companyId', 'roli', 'lejet', 'emri', 'email', 'aktiv', 'krijuar', 'username', 'duhetVerifikim'])
+      return d.keys().hasOnly(['companyId', 'roli', 'lejet', 'emri', 'emriPare', 'mbiemri', 'email', 'aktiv', 'krijuar', 'username', 'duhetVerifikim'])
         && (!('lejet' in d) || d.lejet is list)
         && d.companyId is string
         && validRole(d.roli)
@@ -362,8 +362,10 @@ service cloud.firestore {
         && request.resource.data.companyId == resource.data.companyId
         && request.resource.data.email == resource.data.email
         && request.resource.data.get('duhetVerifikim', false) == resource.data.get('duhetVerifikim', false))
-        // Secili mund të ndryshojë vetëm emrin e vet të hyrjes
-        || (request.auth.uid == uid && isMember(resource.data.companyId) && changedKeys().hasOnly(['username']));
+        // Secili plotëson vetëm të dhënat e veta: emri, mbiemri, emri i përdoruesit
+        || (request.auth.uid == uid && isMember(resource.data.companyId)
+          && changedKeys().hasOnly(['username', 'emri', 'emriPare', 'mbiemri'])
+          && request.resource.data.emri is string && request.resource.data.emri.size() > 0);
 
       allow delete: if false;
     }
