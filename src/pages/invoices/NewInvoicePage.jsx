@@ -80,7 +80,11 @@ export default function NewInvoicePage() {
   }
 
   return (
-    <div>
+    <div className="invoice-editor ni">
+      <div className="ni-head">
+        <h1>Faturë e Re</h1>
+        <div className="muted small">Sistemi i Menaxhimit për {settings.kompania.emri}</div>
+      </div>
       {!editing && (
         <div className="ni-tabs" role="tablist">
           {tabs.map((t) => (
@@ -425,12 +429,7 @@ function InvoiceEditor({ urlBound, onTitle, onIssued }) {
   const numberPreview = nextNumber ? formatDocNumber(settings.numerimi.invoices, nextNumber) : '…'
 
   return (
-    <div className="invoice-editor ni">
-      <div className="ni-head">
-        <h1>Faturë e Re</h1>
-        <div className="muted small">Sistemi i Menaxhimit për {settings.kompania.emri}</div>
-      </div>
-
+    <div>
       {orig && (
         <div className="ni-edit-bar">
           <button type="button" className="ip-back" onClick={() => navigate(-1)} title="Kthehu pa ruajtur asnjë ndryshim"><ArrowLeft size={15} /> Mbrapa</button>
