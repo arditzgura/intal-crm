@@ -979,3 +979,7 @@ th.sortable.sorted .sort-icon { opacity: 1; }
 .ni-box input { padding-top: 10px; padding-bottom: 10px; }
 .ni-final { padding-top: 16px; padding-bottom: 16px; }
 .ni-btn { padding-top: 14px; padding-bottom: 14px; }
+/* Llogaritja finale: çdo qelizë +1 cm në lartësi (≈ +19 px sipër dhe poshtë) */
+.ni-calc .ni-box { padding-top: 27px; padding-bottom: 27px; }
+.ni-calc .ni-final { padding-top: 35px; padding-bottom: 35px; }
+.ni-calc .ni-btn { padding-top: 33px; padding-bottom: 33px; }
