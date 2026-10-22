@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore'
 
 export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -24,4 +24,9 @@ export const SUPER_ADMIN_EMAIL = 'arditzgura@gmail.com'
 
 export const app = configMissing ? null : initializeApp(firebaseConfig)
 export const auth = app ? getAuth(app) : null
-export const db = app ? getFirestore(app) : null
+// Memoria e Firebase në shfletues (IndexedDB): rihapja e aplikacionit nuk rilexon gjithçka nga
+// serveri – lexohen vetëm dokumentet që kanë ndryshuar. Burimi i së vërtetës mbetet Firestore;
+// memoria pastrohet kur përdoruesi del (authService.logout).
+export const db = app
+  ? initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) })
+  : null

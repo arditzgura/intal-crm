@@ -711,8 +711,10 @@ service cloud.firestore {
       // ---------- Paneli ----------
       // Statistikat e ruajtura (rillogariten nga Paneli). Kostoja/fitimi vetëm me sheh_koston.
       match /stats/{docId} {
-        allow read, write: if can(companyId, 'mod_paneli')
-          && (docId == 'paneli' || (docId == 'paneliKosto' && can(companyId, 'sheh_koston')));
+        allow read, write: if (can(companyId, 'mod_paneli')
+            && (docId == 'paneli' || (docId == 'paneliKosto' && can(companyId, 'sheh_koston'))))
+          // Shitjet për artikull (pa kosto): faqja Artikujt, Historiku, Paneli
+          || (docId == 'artikujt' && canAny(companyId, ['mod_artikujt', 'mod_historiku', 'mod_paneli']));
       }
       // Gjendja në fund të muajit (stoku + borxhi): krijohet një herë, nuk ndryshohet.
       match /snapshots/{key} {

@@ -21,7 +21,7 @@ React + Vite, HashRouter, Firebase (Auth email/fjalëkalim + Firestore). Hosting
 - Ndryshimi manual i gjendjes krijon lëvizje "rregullim manual" me diferencën, përdoruesin dhe arsyen (vetëm me lejen `rregullim_gjendjeje`).
 - Asnjë fshirje fizike e dokumenteve financiare – vetëm anulim me arsye. Çdo veprim shkruhet te `auditLog`.
 - **Lejet janë për çdo përdorues**: Admini i zgjedh kur krijon përdoruesin (nga shabllonet Shitës / Financë / Magazinier / I personalizuar) dhe mund t'i ndryshojë më vonë. Zbatohen në **Firestore Security Rules**, jo vetëm në UI. Kosto/fitimi vetëm me lejen `sheh_koston`.
-- Asnjë localStorage për të dhëna biznesi. Listat e mëdha me pagination.
+- Asnjë localStorage për të dhëna biznesi (përjashtim: memoria e Firestore, shih "Lexime të pakta"). Listat e mëdha me pagination.
 - Logjika e biznesit në `services/`, jo brenda komponentëve UI.
 
 ## Struktura (Faza 1)
@@ -63,6 +63,11 @@ React + Vite, HashRouter, Firebase (Auth email/fjalëkalim + Firestore). Hosting
 - `services/dashboardService.js`: borxhi/detyrimet me sum/count nga serveri; statistikat e rënda (grafiku, top artikujt, vlera e stokut, fitimi) te `stats/paneli` + `stats/paneliKosto` (vetëm `sheh_koston`), rillogaritur pas 6 orësh ose me "Rifresko".
 - `snapshots/{YYYY-MM}`: stoku dhe borxhi në fund të muajit, krijohet një herë (rules: vetëm create). Mos shto listener-a mbi koleksione të plota te Paneli.
 - Agregimet: një kërkesë për çdo fushë (`aggregate()` te invoiceService) – Firestore kërkon indeks për çdo kombinim fushash të mbledhura.
+
+## Lexime të pakta (gjithë aplikacioni)
+- Burimet bazë (klientët, artikujt, stoku, kostot, historiku i kostos, arka, cilësimet) dëgjohen me `shared()` (`services/sharedLive.js`): një listener për gjithë aplikacionin, mbetet i hapur mes rubrikave. Burim i ri i përbashkët → mbështille me `shared('emri', …)`; mos hap listener-a të rinj mbi koleksione të plota në faqe.
+- Memoria e Firestore në shfletues (`persistentLocalCache`, miratuar nga pronari si përjashtim i rregullit "pa localStorage"): burimi i së vërtetës mbetet Firestore; `logout()` e pastron (`clearIndexedDbPersistence`).
+- Shitjet për artikull (gjithë kohës + muaji) te `stats/artikujt` (`readItemStats` / `refreshItemStats` / `cachedItemSales`); periudhat e tjera nga serveri vetëm kur zgjidhen.
 
 ## Shumë kompani (Faza 7A)
 - Kompania aktive = `users/{uid}.companyId`, vendoset me `setCompanyId()` te `useAuth` (src/firebase). Mos përdor ID të fiksuar; `LEGACY_COMPANY_ID` ('intal') vetëm për konfigurimin e vjetër `meta/bootstrap`.

@@ -7,7 +7,8 @@ import {
   reauthenticateWithCredential,
   updatePassword,
 } from 'firebase/auth'
-import { doc, getDoc } from 'firebase/firestore'
+import { clearIndexedDbPersistence, doc, getDoc, terminate } from 'firebase/firestore'
+import { resetShared } from './sharedLive'
 import { auth, db } from '../firebase'
 
 const AUTH_ERRORS = {
@@ -68,8 +69,17 @@ export async function refreshVerification() {
   return auth.currentUser.emailVerified
 }
 
-export function logout() {
-  return signOut(auth)
+/** Dalja: mbyll lidhjet, pastron memorien e të dhënave në këtë shfletues dhe rifillon faqen. */
+export async function logout() {
+  resetShared()
+  await signOut(auth)
+  try {
+    await terminate(db)
+    await clearIndexedDbPersistence(db)
+  } catch (err) {
+    console.warn('Memoria lokale nuk u pastrua:', err)
+  }
+  window.location.reload()
 }
 
 export async function changePassword(currentPassword, newPassword) {

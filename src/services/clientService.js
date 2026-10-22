@@ -1,6 +1,7 @@
 import { documentId, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, where, writeBatch } from 'firebase/firestore'
 import { db } from '../firebase'
 import { companyCol, companyDoc, newDocRef } from './paths'
+import { shared } from './sharedLive'
 import { addAudit } from './auditService'
 
 export const WALK_IN_ID = 'klient-rastesor'
@@ -30,13 +31,13 @@ function cleanFields(data) {
 }
 
 /** Të gjithë klientët (≈ qindra), live. Kërkimi dhe faqosja bëhen në shfletues. */
-export function watchClients(onData, onError) {
+export const watchClients = shared('clients', (onData, onError) => {
   return onSnapshot(
     companyCol('clients'),
     (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
     onError,
   )
-}
+})
 
 export function watchClient(id, onData, onError) {
   return onSnapshot(

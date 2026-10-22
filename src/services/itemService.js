@@ -1,6 +1,7 @@
 import { getDoc, onSnapshot, query, runTransaction, serverTimestamp, where, writeBatch } from 'firebase/firestore'
 import { db } from '../firebase'
 import { companyCol, companyDoc, newDocRef } from './paths'
+import { shared } from './sharedLive'
 import { addAudit } from './auditService'
 
 /**
@@ -48,13 +49,13 @@ function cleanItem(data) {
   return out
 }
 
-export function watchItems(onData, onError) {
+export const watchItems = shared('items', (onData, onError) => {
   return onSnapshot(
     companyCol('items'),
     (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
     onError,
   )
-}
+})
 
 export function watchItem(id, onData, onError) {
   return onSnapshot(
@@ -70,13 +71,13 @@ export function watchItemCost(id, onData, onError) {
 }
 
 /** Kostot (vetëm për rolet që i lejon Rules). Kthen { itemId: kosto }. */
-export function watchItemCosts(onData, onError) {
+export const watchItemCosts = shared('itemCosts', (onData, onError) => {
   return onSnapshot(
     companyCol('itemCosts'),
     (snap) => onData(Object.fromEntries(snap.docs.map((d) => [d.id, d.data().kosto]))),
     onError,
   )
-}
+})
 
 /** Kodi i ardhshëm automatik (vetëm sugjerim; konfirmohet në transaction). */
 export async function suggestItemCode() {
@@ -175,7 +176,7 @@ export async function setItemArchived(id, arkivuar, actorName) {
  * llogaritet me koston që kishte artikulli në datën e faturës.
  * Kthen { itemId: [{ kosto, nga(ms) }, ...] } të renditura sipas datës.
  */
-export function watchCostHistory(onData, onError) {
+export const watchCostHistory = shared('costHistory', (onData, onError) => {
   return onSnapshot(
     companyCol('costHistory'),
     (snap) => {
@@ -189,7 +190,7 @@ export function watchCostHistory(onData, onError) {
     },
     onError,
   )
-}
+})
 
 /** Historiku i kostos së një artikulli: { itemId: [{ kosto, nga }] } (formati i costAt). */
 export function watchItemCostHistory(itemId, onData, onError) {

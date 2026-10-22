@@ -3,6 +3,7 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { companyCol, companyDoc, newDocRef } from './paths'
+import { shared } from './sharedLive'
 import { addAudit } from './auditService'
 import { millis } from '../utils/date'
 
@@ -60,9 +61,9 @@ export function writeCash(tx, { llogaria, monedha, kursi, shuma, tipi, data, she
   return ref.id
 }
 
-export function watchCashBalances(onData, onError) {
+export const watchCashBalances = shared('cashBalances', (onData, onError) => {
   return onSnapshot(balancesRef(), (s) => onData(s.exists() ? { arke: s.data().arke ?? {}, banke: s.data().banke ?? {} } : { arke: {}, banke: {} }), onError)
-}
+})
 
 /** Lëvizjet e parave për një periudhë (më e reja e para). */
 export async function queryCash(from, to) {

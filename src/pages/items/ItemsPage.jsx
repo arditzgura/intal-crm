@@ -8,6 +8,8 @@ import { useLive } from '../../hooks/useLive'
 import { useSettings } from '../../hooks/useSettings'
 import { watchItems, watchItemCosts, setItemArchived } from '../../services/itemService'
 import { itemSalesTotals } from '../../services/invoiceService'
+import { cachedItemSales, itemStatsStale, readItemStats, refreshItemStats } from '../../services/dashboardService'
+import { toDate } from '../../utils/date'
 import { watchStock } from '../../services/stockService'
 import { errorMessage } from '../../services/authService'
 import { canSeeCost } from '../../config/roles'
@@ -38,16 +40,44 @@ export default function ItemsPage() {
   const range = useMemo(() => periodRange(period), [period])
   const [actionError, setActionError] = useState('')
 
-  // Shitjet e çdo artikulli (sum nga serveri, një herë kur ngarkohet lista)
+  // Shitjet e çdo artikulli: "Gjithë kohës" dhe muaji aktual nga statistikat e ruajtura
+  // (rillogariten pas 6 orësh ose me "Rifresko"); periudhat e tjera nga serveri kur zgjidhen.
   const itemKey = items.map((i) => i.id).join(',')
+  const [stats, setStats] = useState(null)
+  const [refreshing, setRefreshing] = useState(false)
+  async function refresh() {
+    if (!items.length) return
+    setRefreshing(true)
+    try {
+      setStats(await refreshItemStats(items.map((i) => i.id)))
+    } catch (err) {
+      setActionError(errorMessage(err))
+    } finally {
+      setRefreshing(false)
+    }
+  }
   useEffect(() => {
     if (!items.length) return undefined
+    let cancelled = false
+    readItemStats().then((st) => {
+      if (cancelled) return
+      if (st) setStats(st)
+      if (itemStatsStale(st)) refresh()
+    }).catch(() => {})
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemKey])
+  useEffect(() => {
+    if (!items.length) return undefined
+    const cached = cachedItemSales(stats, range)
+    if (cached) { setSales(cached); return undefined }
+    if (!range.from && !range.to) return undefined // pret statistikat
     let cancelled = false
     setSales(null)
     itemSalesTotals(items.map((i) => i.id), range).then((r) => !cancelled && setSales(r)).catch(() => !cancelled && setSales({}))
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemKey, range])
+  }, [itemKey, range, stats])
   const unitsSold = sales ? Object.values(sales).reduce((a, x) => a + (x.sasia ?? 0), 0) : null
   const activeCount = items.filter((i) => !i.arkivuar).length
   const profitOf = (i) => (sales?.[i.id] && costs[i.id] != null ? sales[i.id].totali - sales[i.id].sasia * costs[i.id] : null)
@@ -112,7 +142,13 @@ export default function ItemsPage() {
         </div>
       </div>
 
-      <div className="card period-card"><PeriodFilter period={period} setPeriod={setPeriod} /></div>
+      <div className="card period-card">
+        <PeriodFilter period={period} setPeriod={setPeriod} />
+        <div className="stats-refresh muted small">
+          {refreshing ? 'Duke rillogaritur shitjet…' : stats ? `Shitjet (gjithë kohës / muaji): ${toDate(stats.perditesuar)?.toLocaleString('sq-AL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : ''}
+          <button type="button" className="btn small" onClick={refresh} disabled={refreshing}>Rifresko</button>
+        </div>
+      </div>
 
       <div className="card filters">
         <input className="grow" placeholder="Kërko me kod ose emër…" value={q} onChange={(e) => setQ(e.target.value)} />

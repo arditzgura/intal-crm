@@ -1,4 +1,5 @@
 import { doc, getDoc, onSnapshot, serverTimestamp, writeBatch } from 'firebase/firestore'
+import { shared } from './sharedLive'
 import { db, getCompanyId, LEGACY_COMPANY_ID } from '../firebase'
 import { addAudit } from './auditService'
 import { RATE_SCALE } from '../utils/money'
@@ -93,13 +94,13 @@ export function withDefaults(stored = {}) {
   return out
 }
 
-export function watchSettings(onData, onError) {
+export const watchSettings = shared('settings', (onData, onError) => {
   return onSnapshot(
     settingsRef(),
     (snap) => onData(withDefaults(snap.exists() ? snap.data() : {})),
     onError,
   )
-}
+})
 
 /** Ruan një seksion të cilësimeve (p.sh. 'kompania') dhe e shkruan te auditLog. */
 export async function saveSettingsSection(section, value, actorName) {

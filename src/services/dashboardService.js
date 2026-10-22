@@ -128,6 +128,43 @@ export async function readCosts() {
   return Object.fromEntries(snap.docs.map((d) => [d.id, d.data().kosto]).filter(([, k]) => k != null))
 }
 
+// ---------- Shitjet për artikull (faqja Artikujt, Historiku) ----------
+
+const monthRangeOf = (now) => ({ from: monthStartOf(now), to: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999) })
+
+/** `stats/artikujt`: { muaji, perditesuar, all: { itemId: { totali, sasia } }, month: {...} } ose null. */
+export async function readItemStats() {
+  const s = await getDoc(companyDoc('stats', 'artikujt'))
+  return s.exists() ? s.data() : null
+}
+
+export function itemStatsStale(st, now = new Date()) {
+  return !st || st.muaji !== monthKey(now) || now - millis(st.perditesuar) > STATS_TTL
+}
+
+function writeItemStats(all, month, now) {
+  const data = { muaji: monthKey(now), perditesuar: serverTimestamp(), all, month }
+  return setDoc(companyDoc('stats', 'artikujt'), data).then(() => ({ ...data, perditesuar: new Date() }))
+}
+
+/** Rillogarit shitjet e çdo artikulli (gjithë kohës + muaji aktual) dhe i ruan. */
+export async function refreshItemStats(itemIds, now = new Date()) {
+  const [all, month] = await Promise.all([itemSalesTotals(itemIds, {}), itemSalesTotals(itemIds, monthRangeOf(now))])
+  return writeItemStats(all, month, now)
+}
+
+/**
+ * Shitjet për artikull për një periudhë nga statistikat e ruajtura: "Gjithë kohës" dhe muaji aktual.
+ * Për periudhat e tjera kthen null (llogariten nga serveri vetëm kur zgjidhen).
+ */
+export function cachedItemSales(st, range, now = new Date()) {
+  if (!st) return null
+  if (!range?.from && !range?.to) return st.all ?? null
+  const m = monthRangeOf(now)
+  if (range.from?.getTime() === m.from.getTime() && range.to?.getTime() === m.to.getTime() && st.muaji === monthKey(now)) return st.month ?? null
+  return null
+}
+
 /** Rillogarit dhe ruan statistikat e Panelit. Kthen { base, cost }. */
 export async function refreshStats(withCost, now = new Date()) {
   const start = monthStartOf(now)
@@ -138,8 +175,10 @@ export async function refreshStats(withCost, now = new Date()) {
   const ids = items.map((i) => i.id)
   const [monthSales, allSales] = await Promise.all([
     itemSalesTotals(ids, monthRange),
-    withCost ? itemSalesTotals(ids, {}) : null,
+    itemSalesTotals(ids, {}),
   ])
+  // Të njëjtat shuma shërbejnë edhe për faqen Artikujt / Historikun
+  await writeItemStats(allSales, monthSales, now)
   const stock = Object.fromEntries(stockSnap.docs.map((d) => [d.id, d.data().sasia ?? 0]))
   let stockSale = 0, prevStockSale = 0, stockCost = 0, prevStockCost = 0
   for (const i of items.filter((x) => !x.arkivuar)) {

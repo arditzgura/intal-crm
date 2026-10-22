@@ -4,6 +4,7 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { companyCol, companyDoc, newDocRef } from './paths'
+import { shared } from './sharedLive'
 import { addAudit } from './auditService'
 import { millis } from '../utils/date'
 
@@ -59,13 +60,13 @@ export function writeMovement(tx, { itemId, sasia, tipi, dokument, data, numri =
 }
 
 /** Stoku i të gjithë artikujve: { itemId: sasia }. */
-export function watchStock(onData, onError) {
+export const watchStock = shared('stock', (onData, onError) => {
   return onSnapshot(
     companyCol('stock'),
     (snap) => onData(Object.fromEntries(snap.docs.map((d) => [d.id, d.data().sasia ?? 0]))),
     onError,
   )
-}
+})
 
 /** Lëvizjet e një artikulli, më e reja e para. */
 export function watchMovementsForItem(itemId, onData, onError) {

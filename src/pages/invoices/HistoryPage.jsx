@@ -21,6 +21,7 @@ import Modal from '../../components/Modal'
 import InvoicePreview from '../../components/invoice/InvoicePreview'
 import PeriodReport from './PeriodReport'
 import { useSort, SortTh } from '../../hooks/useSort'
+import { cachedItemSales, profitFrom, readItemStats } from '../../services/dashboardService'
 import PeriodFilter, { defaultPeriod } from '../../components/PeriodFilter'
 
 
@@ -615,7 +616,11 @@ function SummaryBar({ range, label, items, reloadKey }) {
     if (!showProfit || !items.length || !costKey) return undefined
     let cancelled = false
     setProfit(null)
-    invoiceProfit(range, items.map((i) => i.id), costs).then((p) => !cancelled && setProfit(p)).catch(() => !cancelled && setProfit(undefined))
+    ;(async () => {
+      // "Gjithë kohës" / muaji aktual: nga statistikat e ruajtura (pa qindra kërkesa)
+      const cached = cachedItemSales(await readItemStats().catch(() => null), range)
+      return cached ? profitFrom(cached, costs) : invoiceProfit(range, items.map((i) => i.id), costs)
+    })().then((p) => !cancelled && setProfit(p)).catch(() => !cancelled && setProfit(undefined))
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range, showProfit, items.length, costKey, reloadKey])

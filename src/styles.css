@@ -1002,3 +1002,4 @@ th.sortable.sorted .sort-icon { opacity: 1; }
 .verify-card h2 { margin: 6px 0 8px; }
 .verify-card p { color: var(--muted); font-size: 0.9rem; }
 .verify-icon { color: var(--primary); }
+.stats-refresh { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 8px; }

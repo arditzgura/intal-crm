@@ -3,6 +3,7 @@ import { onAuthStateChanged } from 'firebase/auth'
 import { auth, setCompanyId, SUPER_ADMIN_EMAIL } from '../firebase'
 import { watchUserProfile, isBootstrapped } from '../services/userService'
 import { permissionsOf } from '../config/permissions'
+import { resetShared } from '../services/sharedLive'
 
 const AuthContext = createContext(null)
 
@@ -27,6 +28,7 @@ export function AuthProvider({ children }) {
   useEffect(() => onAuthStateChanged(auth, (u) => {
     setUser(u)
     if (!u) {
+      resetShared()
       setProfile(null)
       setStatus('signedOut')
     } else {
