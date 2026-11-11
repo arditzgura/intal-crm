@@ -15,6 +15,7 @@ import {
   writePointsEntry, numbersText, planLatestChange, applyLatestChange,
 } from './invoiceChain'
 import { millis } from '../utils/date'
+import { writeInvoiceStats } from './aggStats'
 import { formatMoney } from '../utils/money'
 
 /**
@@ -213,6 +214,8 @@ export async function issueInvoice(draftId, data, actorName) {
         anuluar: false,
       })
     })
+    // Statistikat e gatshme (klienti / artikujt / muaji)
+    writeInvoiceStats(tx, { clientId: data.clientId, data: data.data, kursi }, [], rreshtat, 1)
     // Stoku: një lëvizje "dalje" për çdo artikull
     for (const m of aggregateByItem(rreshtat)) {
       writeMovement(tx, { itemId: m.itemId, sasia: -m.sasia, tipi: 'dalje', dokument: 'fature', invoiceId: ref.id, numri: n, data: data.data }, actorName)
@@ -341,8 +344,9 @@ export async function cancelInvoice(id, arsye, actorName, { kthePagesen = false 
     const pts = applyLatestChange(tx, plan, client, settings, latestId === id ? { faturaPas: null } : {})
 
     X.rreshtat.forEach((l, i) => {
-      tx.update(companyDoc('invoiceLines', lineId(id, i)), { anuluar: true })
+      tx.update(companyDoc('invoiceLines', versionLineId(id, X.versioniRreshtave ?? 0, i)), { anuluar: true })
     })
+    writeInvoiceStats(tx, { clientId: X.clientId, data: X.data, kursi: X.kursi }, X.rreshtat, [], -1)
     for (const m of aggregateByItem(X.rreshtat)) {
       writeMovement(tx, { itemId: m.itemId, sasia: m.sasia, tipi: 'kthim_anulim', dokument: 'anulim_fature', invoiceId: id, numri: X.numri }, actorName)
     }
@@ -616,6 +620,8 @@ export async function editInvoice(id, data, actorName) {
       })
     })
 
+    writeInvoiceStats(tx, { clientId: X.clientId, data: X.data, kursi: X.kursi }, X.rreshtat, rreshtat, 0)
+
     // Stoku: vetëm diferenca për çdo artikull
     const qty = new Map()
     for (const m of aggregateByItem(X.rreshtat ?? [])) qty.set(m.itemId, (qty.get(m.itemId) ?? 0) + m.sasia)
@@ -871,6 +877,15 @@ export function watchDrafts(onData, onError) {
 }
 
 /** Rreshtat e faturave (për statistikat e klientit / artikullit). */
+/** Rreshtat e një artikulli në një periudhë (vetëm ajo periudhë, jo gjithë historia). */
+export async function queryItemLines(itemId, { from, to } = {}) {
+  const cons = [where('itemId', '==', itemId)]
+  if (from) cons.push(where('data', '>=', from))
+  if (to) cons.push(where('data', '<=', to))
+  const snap = await getDocs(query(companyCol('invoiceLines'), ...cons, orderBy('data', 'desc')))
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+}
+
 export function watchLines(field, value, onData, onError) {
   return onSnapshot(
     query(companyCol('invoiceLines'), where(field, '==', value)),

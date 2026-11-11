@@ -5,29 +5,41 @@ import { useLive } from '../../hooks/useLive'
 import { watchLines } from '../../services/invoiceService'
 import { watchCostHistory, watchItemCosts } from '../../services/itemService'
 import { aggregateLines } from '../../services/statsService'
+import { monthFilter, sumClient, watchClientStats } from '../../services/aggStats'
 import { canSeeCost } from '../../config/roles'
 import { CURRENCIES, formatMoney } from '../../utils/money'
 
 const sym = (c) => CURRENCIES[c]?.symbol ?? c
 
 /**
- * Të dhënat thelbësore të klientit: faturuar në periudhë, fitimi neto (me koston
- * në datën e faturës) dhe detyrimi global i mbetur (gjendja aktuale).
+ * Të dhënat thelbësore të klientit: faturuar në periudhë, fitimi neto dhe detyrimi global.
+ * Për muaj / vite / gjithë kohës: nga statistikat e gatshme (1 lexim). Për ditë të veçanta:
+ * nga rreshtat e faturave.
  */
 export default function ClientKpis({ client, range, periodLabel }) {
   const { perms } = useAuth()
   const showProfit = canSeeCost(perms)
-  const { data: lines } = useLive((ok, ko) => watchLines('clientId', client.id, ok, ko), [client.id], { initial: [] })
-  const { data: history } = useLive(watchCostHistory, [], { enabled: showProfit, initial: {} })
+  const test = monthFilter(range)
+  const { data: m } = useLive((ok, ko) => watchClientStats(client.id, ok, ko), [client.id], { enabled: !!test, initial: null })
+  const { data: lines } = useLive((ok, ko) => watchLines('clientId', client.id, ok, ko), [client.id], { enabled: !test, initial: [] })
+  const { data: history } = useLive(watchCostHistory, [], { enabled: showProfit && !test, initial: {} })
   const { data: current } = useLive(watchItemCosts, [], { enabled: showProfit, initial: {} })
 
-  const st = useMemo(
-    () => aggregateLines(lines, { groupBy: 'itemId', from: range.from, to: range.to, costs: showProfit ? { history, current } : null }),
-    [lines, range, showProfit, history, current],
-  )
+  const st = useMemo(() => {
+    if (test) {
+      const s = sumClient(m, test)
+      let profit = 0
+      let known = true
+      for (const [id, r] of Object.entries(s.items)) {
+        if (current[id] == null) { known = false; continue }
+        profit += r.t - r.q * current[id]
+      }
+      return { lek: s.t, count: s.n, profit, known, ready: m != null }
+    }
+    const a = aggregateLines(lines, { groupBy: 'itemId', from: range.from, to: range.to, costs: showProfit ? { history, current } : null })
+    return { lek: a.totalLek, count: a.invoiceCount, profit: a.profitLek, known: a.profitKnown, ready: true }
+  }, [test, m, lines, range, showProfit, history, current])
 
-  const invoiced = Object.entries(st.totals).filter(([, v]) => v)
-  const [mainCur, mainVal] = invoiced.find(([c]) => c === 'LEK') ?? invoiced[0] ?? ['LEK', 0]
   const debts = Object.entries(client.gjendje ?? {}).filter(([, v]) => v)
   const [debtCur, debtVal] = debts.find(([c]) => c === (client.monedhaPreferuar || 'LEK')) ?? debts[0] ?? [client.monedhaPreferuar || 'LEK', 0]
 
@@ -36,18 +48,15 @@ export default function ClientKpis({ client, range, periodLabel }) {
       <div className="kpi kpi-white">
         <DollarSign className="kpi-icon" size={46} />
         <span>Faturuar në periudhë</span>
-        <div className="kpi-value">{formatMoney(mainVal)} <small>{sym(mainCur)}</small></div>
-        <div className="kpi-sub">
-          {invoiced.filter(([c]) => c !== mainCur).map(([c, v]) => <span key={c}>+ {formatMoney(v, c)} · </span>)}
-          {periodLabel} · {st.invoiceCount} fatura
-        </div>
+        <div className="kpi-value">{st.ready ? formatMoney(st.lek) : '…'} <small>L</small></div>
+        <div className="kpi-sub">{periodLabel} · {st.count} fatura</div>
       </div>
       {showProfit && (
-        <div className="kpi kpi-green" title="Shitja në LEK − sasia × kosto e artikullit në datën e faturës">
+        <div className="kpi kpi-green" title="Shitja në LEK − sasia × kosto e artikullit">
           <TrendingUp className="kpi-icon" size={46} />
           <span>Fitimi neto nga ky klient</span>
-          <div className="kpi-value">{formatMoney(st.profitLek)} <small>L</small></div>
-          <div className="kpi-sub">{st.profitKnown ? periodLabel : `${periodLabel} · disa artikuj pa kosto`}</div>
+          <div className="kpi-value">{st.ready ? formatMoney(st.profit) : '…'} <small>L</small></div>
+          <div className="kpi-sub">{st.known ? periodLabel : `${periodLabel} · disa artikuj pa kosto`}</div>
         </div>
       )}
       <div className={`kpi kpi-dark ${debtVal < 0 ? 'credit' : ''}`}>

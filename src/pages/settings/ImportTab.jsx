@@ -11,6 +11,7 @@ import { errorMessage } from '../../services/authService'
 import { formatMoney, formatRate, parseRate } from '../../utils/money'
 import { formatDate } from '../../utils/date'
 import { downloadCsv } from '../../utils/csv'
+import { rebuildStats } from '../../services/aggStats'
 
 /**
  * Importi i backup-it të sistemit të vjetër (vetëm Admin):
@@ -131,6 +132,7 @@ export default function ImportTab() {
 
   return (
     <>
+      <StatsRebuild />
       <div className="card">
         <h3>Importi i të dhënave të vjetra</h3>
         <div className="alert">
@@ -280,5 +282,38 @@ function Section({ title, hint, children, open }) {
       {hint && <p className="muted small">{hint}</p>}
       <div className="table-wrap">{children}</div>
     </details>
+  )
+}
+
+/** Statistikat e gatshme (profilet e klientëve / artikujve): rindërtimi nga rreshtat e faturave. */
+function StatsRebuild() {
+  const { profile } = useAuth()
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState(null)
+
+  async function run() {
+    if (!window.confirm('Të rillogariten statistikat nga të gjitha faturat? Lexon një herë të gjitha rreshtat e faturave (disa mijëra lexime).')) return
+    setBusy(true)
+    setMsg(null)
+    try {
+      const r = await rebuildStats(profile?.emri, (text) => setMsg({ type: '', text }))
+      setMsg({ type: 'success', text: `U rillogaritën statistikat nga ${r.rreshta.toLocaleString('sq')} rreshta faturash (${r.dokumente} dokumente).` })
+    } catch (err) {
+      setMsg({ type: 'error', text: errorMessage(err) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card">
+      <h3>Statistikat e gatshme</h3>
+      <p className="muted small">
+        Profilet e klientëve dhe të artikujve lexojnë statistika të përditësuara me çdo faturë (pa lexuar mijëra rreshta).
+        Rillogaritini një herë tani, dhe sërish pas çdo importi.
+      </p>
+      {msg && <div className={`alert ${msg.type}`}>{msg.text}</div>}
+      <button type="button" className="btn primary" onClick={run} disabled={busy}>{busy ? 'Duke rillogaritur…' : 'Rillogarit statistikat'}</button>
+    </div>
   )
 }

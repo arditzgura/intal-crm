@@ -67,6 +67,7 @@ React + Vite, HashRouter, Firebase (Auth email/fjalëkalim + Firestore). Hosting
 ## Lexime të pakta (gjithë aplikacioni)
 - Burimet bazë (klientët, artikujt, stoku, kostot, historiku i kostos, arka, cilësimet) dëgjohen me `shared()` (`services/sharedLive.js`): një listener për gjithë aplikacionin, mbetet i hapur mes rubrikave. Burim i ri i përbashkët → mbështille me `shared('emri', …)`; mos hap listener-a të rinj mbi koleksione të plota në faqe.
 - Memoria e Firestore në shfletues (`persistentLocalCache`, miratuar nga pronari si përjashtim i rregullit "pa localStorage"): burimi i së vërtetës mbetet Firestore; `logout()` e pastron (`clearIndexedDbPersistence`).
+- Statistikat e gatshme (`services/aggStats.js`): `clientStats/{id}`, `itemStats/{id}`, `monthStats/{YYYY-MM}` (shitja LEK `t`, sasia `q`, fatura `n` për muaj), përditësuar me `writeInvoiceStats()` në transaction-in e lëshimit / ndryshimit / anulimit. Profilet lexojnë këto (1 lexim); periudhat me ditë lexojnë vetëm rreshtat e asaj periudhe. Pas importit: Cilësimet → Importi → "Rillogarit statistikat". Fitimi = t − q × kosto aktuale (kostoja nuk ruhet te statistikat).
 - Shitjet për artikull (gjithë kohës + muaji) te `stats/artikujt` (`readItemStats` / `refreshItemStats` / `cachedItemSales`); periudhat e tjera nga serveri vetëm kur zgjidhen.
 
 ## Shumë kompani (Faza 7A)

@@ -4,7 +4,8 @@ import { ArrowLeft, Pencil, Archive, ArchiveRestore, Package, Tag, BarChart3, Tr
 import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
 import { watchItem, watchItemCost, watchItemCostHistory, setItemArchived } from '../../services/itemService'
-import { watchLines } from '../../services/invoiceService'
+import { queryItemLines } from '../../services/invoiceService'
+import { monthFilter, sumItem, watchItemAgg } from '../../services/aggStats'
 import { clientsByIds } from '../../services/clientService'
 import { aggregateLines } from '../../services/statsService'
 import { errorMessage } from '../../services/authService'
@@ -49,17 +50,41 @@ export default function ItemProfilePage() {
     (ok, ko) => onSnapshot(companyDoc('stock', id), (s) => ok(s.exists() ? s.data().sasia ?? 0 : 0), ko),
     [id], { initial: 0 },
   )
-  const { data: lines, loading: linesLoading, error: linesError } = useLive((ok, ko) => watchLines('itemId', id, ok, ko), [id], { initial: [] })
+  // Gjithë kohës / viti: nga statistikat e gatshme (1 lexim). Muaji / dita: vetëm rreshtat e asaj periudhe
+  // (grafiku sipas ditëve kërkon rreshtat).
+  const useAgg = period.kind === 'all' || period.kind === 'year'
+  const { data: agg, error: aggError } = useLive((ok, ko) => watchItemAgg(id, ok, ko), [id], { enabled: useAgg, initial: null })
+  const [rangeLines, setRangeLines] = useState(null)
+  const [rangeError, setRangeError] = useState(null)
+  useEffect(() => {
+    if (useAgg) return undefined
+    let cancelled = false
+    setRangeLines(null)
+    setRangeError(null)
+    queryItemLines(id, range).then((l) => !cancelled && setRangeLines(l)).catch((e) => !cancelled && setRangeError(e))
+    return () => { cancelled = true }
+  }, [id, range, useAgg])
+  const lines = useAgg ? [] : rangeLines ?? []
+  const linesLoading = useAgg ? agg == null && !aggError : rangeLines == null && !rangeError
+  const linesError = useAgg ? aggError : rangeError
 
-  const st = useMemo(
-    () => aggregateLines(lines, { groupBy: 'clientId', from: range.from, to: range.to, costs: showCost ? { history, current: { [id]: cost } } : null }),
-    [lines, range, showCost, history, cost, id],
-  )
+  const st = useMemo(() => {
+    if (useAgg) {
+      const a = sumItem(agg, monthFilter(range) ?? (() => true))
+      const rows = Object.entries(a.clients).filter(([, r]) => r.q || r.t).map(([cid, r]) => ({
+        key: cid, monedha: 'LEK', sasia: r.q, totalLek: r.t, fatura: r.n, cmimiMesatar: r.q ? Math.round(r.t / r.q) : 0,
+        fitimi: cost != null ? r.t - r.q * cost : 0, fitimiIPlote: cost != null,
+      }))
+      return { rows, totalLek: a.t, invoiceCount: a.n, profitLek: cost != null ? a.t - a.q * cost : 0, profitKnown: cost != null, months: a.months }
+    }
+    return aggregateLines(lines, { groupBy: 'clientId', from: range.from, to: range.to, costs: showCost ? { history, current: { [id]: cost } } : null })
+  }, [useAgg, agg, lines, range, showCost, history, cost, id])
   const qty = st.rows.reduce((a, r) => a + r.sasia, 0)
+  const chartData = useAgg ? bucketsFromMonths(st.months ?? {}, period) : buckets(lines, period, range)
 
   // Emrat vetëm për klientët që e kanë blerë artikullin
   const [names, setNames] = useState({})
-  const clientKey = [...new Set(lines.map((l) => l.clientId))].sort().join(',')
+  const clientKey = st.rows.map((r) => r.key).sort().join(',')
   useEffect(() => {
     if (!clientKey) return
     clientsByIds(clientKey.split(',')).then(setNames).catch(() => {})
@@ -168,7 +193,7 @@ export default function ItemProfilePage() {
                 <span><i className="ln" /> Trendi</span>
               </div>
             </div>
-            <QtyChart lines={lines} period={period} range={range} />
+            <QtyChart data={chartData} />
           </div>
 
           <div className="ip-panel no-pad">
@@ -280,8 +305,29 @@ function buckets(lines, period, range) {
   return [{ label: periodLabel(period), q: valid.reduce((a, l) => a + l.sasia, 0) }]
 }
 
-function QtyChart({ lines, period, range }) {
-  const data = buckets(lines, period, range)
+/** Grafiku nga statistikat mujore: viti → muajt e tij; gjithë kohës → vite (ose muaj nëse ka vetëm një vit). */
+function bucketsFromMonths(months, period) {
+  const keys = Object.keys(months).filter((k) => months[k]).sort()
+  if (period.kind === 'year') {
+    const y = Number(period.year)
+    const now = new Date()
+    const last = y === now.getFullYear() ? now.getMonth() : 11
+    return Array.from({ length: last + 1 }, (_, m) => ({ label: MONTHS[m], q: months[`${y}-${String(m + 1).padStart(2, '0')}`] ?? 0 }))
+  }
+  if (!keys.length) return []
+  const years = [...new Set(keys.map((k) => Number(k.slice(0, 4))))]
+  const min = Math.min(...years)
+  const max = Math.max(...years)
+  if (max - min >= 1) {
+    return Array.from({ length: max - min + 1 }, (_, i) => {
+      const y = min + i
+      return { label: String(y), q: keys.filter((k) => k.startsWith(`${y}-`)).reduce((a, k) => a + months[k], 0) }
+    })
+  }
+  return keys.map((k) => ({ label: MONTHS[Number(k.slice(5)) - 1], q: months[k] }))
+}
+
+function QtyChart({ data }) {
   if (!data.length || data.every((d) => !d.q)) return <p className="muted">Asnjë shitje në këtë periudhë.</p>
   const W = 1000
   const H = 240
