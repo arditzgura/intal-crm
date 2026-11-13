@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { StockTab, MovementsTab, CountSheet } from '../inventory/InventoryPage'
 import { Plus, Pencil, Trash2, ArchiveRestore, AlertTriangle, ShoppingCart, Layers } from 'lucide-react'
 import PeriodFilter, { defaultPeriod } from '../../components/PeriodFilter'
 import { periodLabel, periodRange } from '../../utils/date'
@@ -20,7 +21,39 @@ import Pagination, { usePaged } from '../../components/Pagination'
 import { useSort, SortTh } from '../../hooks/useSort'
 import ItemFormModal from './ItemFormModal'
 
+/**
+ * Artikujt me nënrubrikat: Artikujt · Gjendja e stokut · Regjistri i lëvizjeve · Inventarizimi
+ * (stoku sipas lejeve mod_inventari / inventar_rregullim).
+ */
 export default function ItemsPage() {
+  const { perms } = useAuth()
+  const [params, setParams] = useSearchParams()
+  const tabs = [
+    ['artikujt', 'Artikujt'],
+    ...(perms.has('mod_inventari') ? [['gjendja', 'Gjendja e stokut'], ['levizjet', 'Regjistri i lëvizjeve']] : []),
+    ...(perms.has('inventar_rregullim') ? [['inventarizim', 'Inventarizimi']] : []),
+  ]
+  const tab = tabs.some(([k]) => k === params.get('skeda')) ? params.get('skeda') : 'artikujt'
+  const bar = tabs.length > 1 && (
+    <div className="tabs" role="tablist">
+      {tabs.map(([k, label]) => (
+        <button key={k} role="tab" className={`tab ${tab === k ? 'active' : ''}`} onClick={() => setParams(k === 'artikujt' ? {} : { skeda: k })}>{label}</button>
+      ))}
+    </div>
+  )
+  if (tab === 'artikujt') return <ArticlesList tabsBar={bar} />
+  return (
+    <div>
+      <div className="page-head"><h1 className="page-title">Artikujt</h1></div>
+      {bar}
+      {tab === 'gjendja' && <StockTab />}
+      {tab === 'levizjet' && <MovementsTab />}
+      {tab === 'inventarizim' && <CountSheet />}
+    </div>
+  )
+}
+
+function ArticlesList({ tabsBar }) {
   const { perms, profile } = useAuth()
   const navigate = useNavigate()
   const { settings } = useSettings()
@@ -128,6 +161,7 @@ export default function ItemsPage() {
           </button>
         )}
       </div>
+      {tabsBar}
 
       <div className="kpi-row items-kpis">
         <div className="kpi kpi-dark kpi-pink">

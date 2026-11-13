@@ -20,7 +20,6 @@ export const MODULES = [
   { key: 'artikujt', label: 'Artikujt', icon: 'Package', perm: 'mod_artikujt', phase: 2 },
   { key: 'blerje', label: 'Fletëhyrje', icon: 'PackagePlus', perm: 'mod_blerje', phase: 4 },
   { key: 'financa', label: 'Arka', icon: 'Wallet', perm: 'mod_financa', phase: 5 },
-  { key: 'inventari', label: 'Inventari', icon: 'Warehouse', perm: 'mod_inventari', phase: 4 },
   { key: 'raporte', label: 'Raporte', icon: 'BarChart3', perm: 'mod_raporte', phase: 5 },
   { key: 'cilesimet', label: 'Cilësimet', icon: 'Settings', perm: 'admin', phase: 1 },
 ]

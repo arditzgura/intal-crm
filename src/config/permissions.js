@@ -14,7 +14,7 @@ export const PERMISSION_GROUPS = [
       ['mod_artikujt', 'Artikujt'],
       ['mod_blerje', 'Fletëhyrje'],
       ['mod_financa', 'Arka'],
-      ['mod_inventari', 'Inventari'],
+      ['mod_inventari', 'Stoku (Artikujt: gjendja e stokut, lëvizjet)'],
       ['mod_raporte', 'Raporte'],
     ],
   },

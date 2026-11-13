@@ -17,7 +17,6 @@ import ItemProfilePage from './pages/items/ItemProfilePage'
 import NewInvoicePage from './pages/invoices/NewInvoicePage'
 import HistoryPage from './pages/invoices/HistoryPage'
 import InvoiceViewPage from './pages/invoices/InvoiceViewPage'
-import InventoryPage from './pages/inventory/InventoryPage'
 import PurchasesPage from './pages/purchases/PurchasesPage'
 import NewPurchasePage from './pages/purchases/NewPurchasePage'
 import PurchaseViewPage from './pages/purchases/PurchaseViewPage'
@@ -36,7 +35,6 @@ const PAGES = {
   artikujt: ItemsPage,
   'fature-e-re': NewInvoicePage,
   historiku: HistoryPage,
-  inventari: InventoryPage,
   blerje: PurchasesPage,
   financa: FinancePage,
   raporte: ReportsPage,

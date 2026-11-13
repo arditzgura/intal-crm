@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Download, RefreshCw, SlidersHorizontal, AlertTriangle } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
@@ -16,27 +16,10 @@ import Pagination, { usePaged } from '../../components/Pagination'
 import Modal from '../../components/Modal'
 import { useSort, SortTh } from '../../hooks/useSort'
 
-export default function InventoryPage() {
-  const { perms } = useAuth()
-  const [params, setParams] = useSearchParams()
-  const tab = params.get('skeda') ?? 'gjendja'
-  const canAdjust = perms.has('inventar_rregullim')
-  const tabs = [['gjendja', 'Gjendja e stokut'], ['levizjet', 'Regjistri i lëvizjeve'], ...(canAdjust ? [['inventarizim', 'Inventarizim']] : [])]
-
-  return (
-    <div>
-      <h1 className="page-title">Inventari</h1>
-      <div className="tabs" role="tablist">
-        {tabs.map(([k, label]) => (
-          <button key={k} role="tab" className={`tab ${tab === k ? 'active' : ''}`} onClick={() => setParams({ skeda: k })}>{label}</button>
-        ))}
-      </div>
-      {tab === 'gjendja' && <StockTab />}
-      {tab === 'levizjet' && <MovementsTab />}
-      {tab === 'inventarizim' && canAdjust && <CountSheet />}
-    </div>
-  )
-}
+/*
+ * Nënrubrikat e stokut (tani te faqja Artikujt): Gjendja e stokut, Regjistri i lëvizjeve,
+ * Inventarizimi. Rubrika "Inventari" më vete u hoq.
+ */
 
 function useStockData() {
   const { perms } = useAuth()
@@ -47,7 +30,7 @@ function useStockData() {
   return { items, stock, costs, showCost, loading }
 }
 
-function StockTab() {
+export function StockTab() {
   const { perms, profile } = useAuth()
   const { settings } = useSettings()
   const { items, stock, costs, showCost, loading } = useStockData()
@@ -247,7 +230,7 @@ function AdjustModal({ item, actorName, onClose }) {
 }
 
 /** Fletë inventarizimi: sasia e numëruar për shumë artikuj njëherësh. */
-function CountSheet() {
+export function CountSheet() {
   const { profile } = useAuth()
   const { items, stock } = useStockData()
   const [counts, setCounts] = useState({})
@@ -330,7 +313,7 @@ function CountSheet() {
 }
 
 /** Regjistri i lëvizjeve të stokut (të gjithë artikujt), me faqe. */
-function MovementsTab() {
+export function MovementsTab() {
   const { data: items } = useLive(watchItems, [], { initial: [] })
   const byId = useMemo(() => Object.fromEntries(items.map((i) => [i.id, i])), [items])
   const [tipi, setTipi] = useState('')
