@@ -14,8 +14,10 @@ import { queryCash, cashFlow } from '../../services/cashService'
 import { ISSUED } from '../../services/invoiceChain'
 import { errorMessage } from '../../services/authService'
 import { canSeeCost } from '../../config/roles'
-import { formatMoney, toLek } from '../../utils/money'
-import { endOfDay, formatDate, millis, startOfDay, toInputDate } from '../../utils/date'
+import { formatMoney, toLek, RATE_SCALE } from '../../utils/money'
+import { endOfDay, formatDate, millis, periodLabel, periodRange, startOfDay, toInputDate } from '../../utils/date'
+import PeriodFilter, { defaultPeriod } from '../../components/PeriodFilter'
+import { monthFilter } from '../../services/aggStats'
 import { downloadCsv } from '../../utils/csv'
 import { useSort, SortTh } from '../../hooks/useSort'
 
@@ -27,7 +29,6 @@ const REPORTS = [
   ['inventari', 'Vlera e inventarit'],
 ]
 
-const monthStart = () => { const d = new Date(); return toInputDate(new Date(d.getFullYear(), d.getMonth(), 1)) }
 
 export default function ReportsPage() {
   const { perms } = useAuth()
@@ -60,33 +61,58 @@ export default function ReportsPage() {
 
 // ---------- Ndihmës ----------
 
-/** Periudha + rreshtat e faturave të lëshuara (pa të anuluarat). */
-function useLines() {
-  const [from, setFrom] = useState(monthStart())
-  const [to, setTo] = useState(toInputDate())
-  const [period, setPeriod] = useState({ from: monthStart(), to: toInputDate() })
-  const [lines, setLines] = useState([])
+/**
+ * Periudha (butonat kohorë të aplikacionit) + të dhënat e shitjeve.
+ * Gjithë kohës / muaj / vit: nga përmbledhjet mujore të gatshme (`monthStats`, disa lexime);
+ * ditë të veçanta (ose `needLines`): nga rreshtat e faturave të periudhës.
+ * Kthen `lines` (rreshta të vërtetë ose "rreshta" të përmbledhur me t / q / n) sipas grupimit.
+ */
+function useLines({ needLines = false } = {}) {
+  const [period, setPeriodState] = useState(() => ({ ...defaultPeriod(), kind: 'month' }))
+  const range = useMemo(() => periodRange(period), [period])
+  const test = needLines ? null : monthFilter(range)
+  const [data, setData] = useState({ lines: [], clientLines: [], itemLines: [], invoiceCount: 0, stats: false })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError('')
-    getDocs(query(companyCol('invoiceLines'), where('data', '>=', startOfDay(period.from)), where('data', '<=', endOfDay(period.to)), orderBy('data', 'desc')))
-      .then((s) => !cancelled && setLines(s.docs.map((d) => ({ id: d.id, ...d.data() })).filter((l) => !l.anuluar)))
+    const job = test
+      ? getDocs(companyCol('monthStats')).then((snap) => {
+        const clientLines = []
+        const itemLines = []
+        let invoiceCount = 0
+        for (const d of snap.docs) {
+          if (!test(d.id)) continue
+          const v = d.data()
+          const [y, m] = d.id.split('-').map(Number)
+          const data = new Date(y, m - 1, 1)
+          invoiceCount += v.n ?? 0
+          for (const [clientId, r] of Object.entries(v.c ?? {})) if (r.t || r.q) clientLines.push({ clientId, data, sasia: r.q, totali: r.t, kursi: RATE_SCALE, monedha: 'LEK', n: r.n })
+          for (const [itemId, r] of Object.entries(v.i ?? {})) if (r.t || r.q) itemLines.push({ itemId, data, sasia: r.q, totali: r.t, kursi: RATE_SCALE, monedha: 'LEK', n: r.n })
+        }
+        return { lines: [], clientLines, itemLines, invoiceCount, stats: true }
+      })
+      : getDocs(query(companyCol('invoiceLines'), ...(range.from ? [where('data', '>=', range.from)] : []), ...(range.to ? [where('data', '<=', range.to)] : []), orderBy('data', 'desc')))
+        .then((snap) => {
+          const lines = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((l) => !l.anuluar)
+          return { lines, clientLines: lines, itemLines: lines, invoiceCount: new Set(lines.map((l) => l.invoiceId)).size, stats: false }
+        })
+    job.then((r) => !cancelled && setData(r))
       .catch((err) => !cancelled && setError(errorMessage(err)))
       .finally(() => !cancelled && setLoading(false))
     return () => { cancelled = true }
-  }, [period])
-  const form = (
-    <>
-      <label className="inline-field">Nga <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-      <label className="inline-field">Deri <input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
-      <button type="button" className="btn primary" onClick={() => setPeriod({ from, to })}>Shfaq</button>
-    </>
-  )
-  return { lines, loading, error, form, period }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [range, !!test])
+  const form = <PeriodFilter period={period} setPeriod={setPeriodState} />
+  const label = periodLabel(period)
+  const fileTag = label.replace(/[^\p{L}\p{N}]+/gu, '_')
+  return { ...data, loading, error, form, label, fileTag }
 }
+
+/** Rreshtat sipas grupimit: artikulli / kategoria nga artikujt, të tjerat nga klientët. */
+const linesFor = (L, by) => (by === 'artikulli' || by === 'kategoria' ? L.itemLines : L.clientLines)
 
 function useLookups() {
   const { data: clients } = useLive(watchClients, [], { initial: [] })
@@ -186,36 +212,38 @@ function Cards({ items }) {
 // ---------- Shitjet ----------
 
 function SalesReport() {
-  const L = useLines()
+  const [orig, setOrig] = useState(false)
+  const L = useLines({ needLines: orig })
   const { cById, iById } = useLookups()
   const [by, setBy] = useState('klienti')
-  const [orig, setOrig] = useState(false)
   const [top, setTop] = useState(0)
+  const src = linesFor(L, by)
 
   const rows = useMemo(() => {
     const m = new Map()
-    for (const l of L.lines) {
+    for (const l of src) {
       const g = groupKey(l, by, cById, iById)
       const k = orig ? `${g}|${l.monedha}` : g
       const r = m.get(k) ?? { key: g, monedha: orig ? l.monedha : 'LEK', sasia: 0, totali: 0, lek: 0, fatura: new Set() }
       r.sasia += l.sasia
       r.totali += l.totali
       r.lek += toLek(l.totali, l.kursi)
-      r.fatura.add(l.invoiceId)
+      if (l.n != null) r.n = (r.n ?? 0) + l.n
+      else r.fatura.add(l.invoiceId)
       m.set(k, r)
     }
-    let arr = [...m.values()].map((r) => ({ ...r, fatura: r.fatura.size }))
+    let arr = [...m.values()].map((r) => ({ ...r, fatura: r.n ?? r.fatura.size }))
     arr = by === 'muaji' ? arr.sort((a, b) => b.key.localeCompare(a.key)) : arr.sort((a, b) => b.lek - a.lek)
     return top ? arr.slice(0, top) : arr
-  }, [L.lines, by, orig, top, cById, iById])
+  }, [src, by, orig, top, cById, iById])
 
-  const totalLek = L.lines.reduce((s, l) => s + toLek(l.totali, l.kursi), 0)
-  const invoices = new Set(L.lines.map((l) => l.invoiceId)).size
+  const totalLek = L.clientLines.reduce((s, l) => s + toLek(l.totali, l.kursi), 0)
+  const invoices = L.invoiceCount
   const ss = useSort(rows, { emri: (r) => groupLabel(r.key, by, cById, iById), monedha: (r) => r.monedha, sasia: (r) => r.sasia, totali: (r) => (orig ? r.totali : r.lek), lek: (r) => r.lek, fatura: (r) => r.fatura })
 
   return (
     <>
-      <Toolbar onCsv={() => downloadCsv(`shitjet_${by}_${L.period.from}_${L.period.to}.csv`, [GROUP_LABELS[by], 'Monedha', 'Sasia', 'Totali', 'Totali LEK', 'Fatura'],
+      <Toolbar onCsv={() => downloadCsv(`shitjet_${by}_${L.fileTag}.csv`, [GROUP_LABELS[by], 'Monedha', 'Sasia', 'Totali', 'Totali LEK', 'Fatura'],
         rows.map((r) => [groupLabel(r.key, by, cById, iById), r.monedha, r.sasia, formatMoney(orig ? r.totali : r.lek), formatMoney(r.lek), r.fatura]))}>
         {L.form}
         <select value={by} onChange={(e) => setBy(e.target.value)}>
@@ -228,9 +256,9 @@ function SalesReport() {
         </select>
         <label className="check"><input type="checkbox" checked={orig} onChange={(e) => setOrig(e.target.checked)} /> Monedha origjinale</label>
       </Toolbar>
-      <p className="print-only">Periudha: {formatDate(startOfDay(L.period.from))} – {formatDate(startOfDay(L.period.to))}</p>
+      <p className="print-only">Periudha: {L.label}</p>
       {L.error && <div className="alert error">{L.error}</div>}
-      <Cards items={[['Shitjet (LEK)', formatMoney(totalLek, 'LEK')], ['Fatura', String(invoices)], ['Njësi të shitura', String(L.lines.reduce((s, l) => s + l.sasia, 0))]]} />
+      <Cards items={[['Shitjet (LEK)', formatMoney(totalLek, 'LEK')], ['Fatura', String(invoices)], ['Njësi të shitura', String(L.itemLines.reduce((s, l) => s + l.sasia, 0))]]} />
       <div className="card no-pad">
         <div className="table-wrap">
           <table className="table">
@@ -266,16 +294,18 @@ function SalesReport() {
 // ---------- Fitimi bruto ----------
 
 function ProfitReport() {
-  const L = useLines()
+  const [by, setBy] = useState('artikulli')
+  const [top, setTop] = useState(0)
+  // Fitimi kërkon artikullin për çdo shitje: sipas klientit / qytetit lexohen rreshtat e periudhës
+  const L = useLines({ needLines: by === 'klienti' || by === 'qyteti' })
   const { cById, iById } = useLookups()
   const { data: history } = useLive(watchCostHistory, [], { initial: {} })
   const { data: current } = useLive(watchItemCosts, [], { initial: {} })
-  const [by, setBy] = useState('artikulli')
 
   const { rows, tot } = useMemo(() => {
     const m = new Map()
     const tot = { shitje: 0, kosto: 0, pa: 0 }
-    for (const l of L.lines) {
+    for (const l of L.itemLines) {
       const k = groupKey(l, by, cById, iById)
       const r = m.get(k) ?? { key: k, sasia: 0, shitje: 0, kosto: 0, paKosto: 0 }
       const lek = toLek(l.totali, l.kursi)
@@ -287,8 +317,9 @@ function ProfitReport() {
       m.set(k, r)
     }
     const arr = [...m.values()].map((r) => ({ ...r, fitimi: r.shitje - r.paKosto - r.kosto }))
-    return { rows: by === 'muaji' ? arr.sort((a, b) => b.key.localeCompare(a.key)) : arr.sort((a, b) => b.fitimi - a.fitimi), tot }
-  }, [L.lines, by, history, current, cById, iById])
+    const sorted = by === 'muaji' ? arr.sort((a, b) => b.key.localeCompare(a.key)) : arr.sort((a, b) => b.fitimi - a.fitimi)
+    return { rows: top ? sorted.slice(0, top) : sorted, tot }
+  }, [L.itemLines, by, top, history, current, cById, iById])
 
   const fsort = useSort(rows, { emri: (r) => groupLabel(r.key, by, cById, iById), sasia: (r) => r.sasia, shitje: (r) => r.shitje, kosto: (r) => r.kosto, fitimi: (r) => r.fitimi, marzhi: (r) => (r.shitje - r.paKosto ? r.fitimi / (r.shitje - r.paKosto) : null) })
   const fitimi = tot.shitje - tot.pa - tot.kosto
@@ -296,13 +327,19 @@ function ProfitReport() {
 
   return (
     <>
-      <Toolbar onCsv={() => downloadCsv(`fitimi_${by}_${L.period.from}_${L.period.to}.csv`, [GROUP_LABELS[by], 'Sasia', 'Shitje LEK', 'Kosto LEK', 'Fitimi LEK', 'Marzhi %', 'Shitje pa kosto'],
+      <Toolbar onCsv={() => downloadCsv(`fitimi_${by}_${L.fileTag}.csv`, [GROUP_LABELS[by], 'Sasia', 'Shitje LEK', 'Kosto LEK', 'Fitimi LEK', 'Marzhi %', 'Shitje pa kosto'],
         rows.map((r) => [groupLabel(r.key, by, cById, iById), r.sasia, formatMoney(r.shitje), formatMoney(r.kosto), formatMoney(r.fitimi), r.shitje - r.paKosto ? Math.round((r.fitimi * 1000) / (r.shitje - r.paKosto)) / 10 : '', formatMoney(r.paKosto)]))}>
         {L.form}
         <select value={by} onChange={(e) => setBy(e.target.value)}>
           {Object.entries(GROUP_LABELS).map(([k, v]) => <option key={k} value={k}>Sipas: {v}</option>)}
         </select>
+        <select value={top} onChange={(e) => setTop(Number(e.target.value))}>
+          <option value={0}>Të gjithë</option>
+          <option value={10}>Top 10</option>
+          <option value={20}>Top 20</option>
+        </select>
       </Toolbar>
+      <p className="print-only">Periudha: {L.label}</p>
       {L.error && <div className="alert error">{L.error}</div>}
       <Cards items={[
         ['Shitjet (LEK)', formatMoney(tot.shitje, 'LEK')],
@@ -336,7 +373,7 @@ function ProfitReport() {
           </table>
         </div>
       </div>
-      <p className="muted small">Fitimi = shitja në LEK − sasia × kosto e artikullit në datën e faturës. * = ka shitje pa kosto.</p>
+      <p className="muted small">Fitimi = shitja në LEK − sasia × kosto e artikullit {L.stats ? 'në fillim të çdo muaji' : 'në datën e faturës'}. * = ka shitje pa kosto.</p>
     </>
   )
 }
@@ -441,26 +478,26 @@ function AgingReport() {
 // ---------- Cash flow ----------
 
 function CashFlowReport() {
-  const [from, setFrom] = useState(toInputDate(new Date(new Date().getFullYear(), 0, 1)))
-  const [to, setTo] = useState(toInputDate())
-  const [period, setPeriod] = useState({ from, to })
+  const [period, setPeriod] = useState(() => ({ ...defaultPeriod(), kind: 'year' }))
+  const range = useMemo(() => periodRange(period), [period])
   const [rows, setRows] = useState([])
   const [error, setError] = useState('')
   useEffect(() => {
-    queryCash(startOfDay(period.from), endOfDay(period.to)).then(setRows).catch((err) => setError(errorMessage(err)))
-  }, [period])
+    setError('')
+    queryCash(range.from ?? new Date(2000, 0, 1), range.to ?? endOfDay(toInputDate())).then(setRows).catch((err) => setError(errorMessage(err)))
+  }, [range])
+  const fileTag = periodLabel(period).replace(/[^\p{L}\p{N}]+/gu, '_')
   const flow = cashFlow(rows, 'month')
   const keys = Object.keys(flow).sort()
   const currencies = [...new Set(keys.flatMap((k) => Object.keys(flow[k])))]
 
   return (
     <>
-      <Toolbar onCsv={() => downloadCsv(`cashflow_${period.from}_${period.to}.csv`, ['Muaji', 'Monedha', 'Hyrje', 'Dalje', 'Neto'],
+      <Toolbar onCsv={() => downloadCsv(`cashflow_${fileTag}.csv`, ['Muaji', 'Monedha', 'Hyrje', 'Dalje', 'Neto'],
         keys.flatMap((k) => Object.entries(flow[k]).map(([m, v]) => [k, m, formatMoney(v.hyrje), formatMoney(v.dalje), formatMoney(v.hyrje - v.dalje)])))}>
-        <label className="inline-field">Nga <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-        <label className="inline-field">Deri <input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
-        <button type="button" className="btn primary" onClick={() => setPeriod({ from, to })}>Shfaq</button>
+        <PeriodFilter period={period} setPeriod={setPeriod} />
       </Toolbar>
+      <p className="print-only">Periudha: {periodLabel(period)}</p>
       {error && <div className="alert error">{error}</div>}
       {currencies.map((m) => {
         let cum = 0
