@@ -13,7 +13,7 @@ export const PERMISSION_GROUPS = [
       ['mod_kliente', 'Klientë'],
       ['mod_artikujt', 'Artikujt'],
       ['mod_blerje', 'Fletëhyrje'],
-      ['mod_financa', 'Financa (Cash Flow)'],
+      ['mod_financa', 'Arka'],
       ['mod_inventari', 'Inventari'],
       ['mod_raporte', 'Raporte'],
     ],
@@ -37,7 +37,7 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
-    label: 'Financa',
+    label: 'Arka',
     items: [
       ['financa_furnitore', 'Paguaj furnitorë'],
       ['financa_shpenzime', 'Regjistro / anulo shpenzime'],

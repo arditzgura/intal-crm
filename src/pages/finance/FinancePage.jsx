@@ -36,7 +36,7 @@ export default function FinancePage() {
   return (
     <div>
       <div className="page-head">
-        <h1 className="page-title">Financa (Cash Flow)</h1>
+        <h1 className="page-title">Arka</h1>
         <div className="actions">
           {perms.has('financa_shpenzime') && <button className="btn primary" onClick={() => setModal('shpenzim')}><Plus size={16} /> Shpenzim</button>}
           {perms.has('financa_furnitore') && <button className="btn" onClick={() => setModal('furnitor')}><Wallet size={16} /> Paguaj furnitorin</button>}

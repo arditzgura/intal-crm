@@ -43,7 +43,7 @@ export default function SupplierTab({ client }) {
             </div>
           )) : <p className="muted">Nuk ka detyrim ndaj këtij furnitori.</p>}
         </div>
-        <p className="muted small">Ky detyrim mbahet veçmas dhe nuk ndikon në faturat e klientit. Pagesat dalin nga arka/banka te Financa.</p>
+        <p className="muted small">Ky detyrim mbahet veçmas dhe nuk ndikon në faturat e klientit. Pagesat dalin nga arka/banka te rubrika Arka.</p>
       </div>
 
       <div className="card no-pad">
