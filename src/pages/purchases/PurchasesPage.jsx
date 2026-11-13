@@ -89,6 +89,14 @@ export function PurchaseList({ fixedSupplierId }) {
     statusi: (r) => r.statusi,
   })
 
+  // Zgjedhjet (furnitori, statusi) aplikohen menjëherë, pa shtypur "Kërko"
+  const applyNow = (next) => {
+    setDraft(next)
+    setPages([null])
+    setPage(0)
+    setFilters(next)
+  }
+
   const apply = (e) => {
     e?.preventDefault()
     setPages([null])
@@ -106,7 +114,7 @@ export function PurchaseList({ fixedSupplierId }) {
         <label className="inline-field">Nga <input type="date" value={draft.from} onChange={(e) => setDraft({ ...draft, from: e.target.value })} /></label>
         <label className="inline-field">Deri <input type="date" value={draft.to} onChange={(e) => setDraft({ ...draft, to: e.target.value })} /></label>
         {!fixedSupplierId && (
-          <select value={draft.furnitorId} onChange={(e) => setDraft({ ...draft, furnitorId: e.target.value })}>
+          <select value={draft.furnitorId} onChange={(e) => applyNow({ ...draft, furnitorId: e.target.value })}>
             <option value="">Të gjithë furnitorët</option>
             {options.length > 0 && (
               <optgroup label="Furnitorët">
@@ -120,7 +128,7 @@ export function PurchaseList({ fixedSupplierId }) {
             )}
           </select>
         )}
-        <select value={draft.statusi} onChange={(e) => setDraft({ ...draft, statusi: e.target.value })}>
+        <select value={draft.statusi} onChange={(e) => applyNow({ ...draft, statusi: e.target.value })}>
           <option value="">Të gjitha</option>
           <option value="regjistruar">Të regjistruara</option>
           <option value="anuluar">Të anuluara</option>
