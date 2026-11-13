@@ -8,7 +8,6 @@ import { queryPurchases } from '../../services/purchaseService'
 import { errorMessage } from '../../services/authService'
 import { formatMoney } from '../../utils/money'
 import { endOfDay, formatDate, startOfDay } from '../../utils/date'
-import SearchPicker from '../../components/SearchPicker'
 import { useSort, SortTh } from '../../hooks/useSort'
 
 const EMPTY = { from: '', to: '', furnitorId: '', statusi: '' }
@@ -40,13 +39,22 @@ export function PurchaseList({ fixedSupplierId }) {
   const [more, setMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // Origjinat e hyrjeve (p.sh. MAGAZINA QENDRORE, TURKE) që janë parë në listë – zgjedhje te filtri
+  const [origins, setOrigins] = useState([])
+  useEffect(() => {
+    const names = rows.map((r) => r.origjinaEmri).filter(Boolean)
+    setOrigins((o) => (names.some((n) => !o.includes(n)) ? [...new Set([...o, ...names])].sort((a, b) => a.localeCompare(b, 'sq')) : o))
+  }, [rows])
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+    // Filtri: "f:<id>" = furnitor (klient), "o:<emri>" = origjina e hyrjes
+    const sel = filters.furnitorId || ''
     queryPurchases(
       {
-        furnitorId: fixedSupplierId || filters.furnitorId || undefined,
+        furnitorId: fixedSupplierId || (sel.startsWith('f:') ? sel.slice(2) : undefined),
+        origjinaEmri: sel.startsWith('o:') ? sel.slice(2) : undefined,
         statusi: filters.statusi || undefined,
         from: filters.from ? startOfDay(filters.from) : undefined,
         to: filters.to ? endOfDay(filters.to) : undefined,
@@ -88,7 +96,7 @@ export function PurchaseList({ fixedSupplierId }) {
     setFilters(draft)
   }
   const options = useMemo(
-    () => clients.filter((c) => c.tipi !== 'klient').map((c) => ({ id: c.id, label: `${c.kodi} – ${c.emri}`, search: [c.kodi, c.emri] })),
+    () => clients.filter((c) => c.tipi && c.tipi !== 'klient').sort((a, b) => a.emri.localeCompare(b.emri, 'sq')).map((c) => ({ id: c.id, label: `${c.kodi} – ${c.emri}` })),
     [clients],
   )
 
@@ -98,9 +106,19 @@ export function PurchaseList({ fixedSupplierId }) {
         <label className="inline-field">Nga <input type="date" value={draft.from} onChange={(e) => setDraft({ ...draft, from: e.target.value })} /></label>
         <label className="inline-field">Deri <input type="date" value={draft.to} onChange={(e) => setDraft({ ...draft, to: e.target.value })} /></label>
         {!fixedSupplierId && (
-          <div className="grow picker-filter">
-            <SearchPicker options={options} value={draft.furnitorId} onChange={(id) => setDraft({ ...draft, furnitorId: id })} placeholder="Të gjithë furnitorët" />
-          </div>
+          <select value={draft.furnitorId} onChange={(e) => setDraft({ ...draft, furnitorId: e.target.value })}>
+            <option value="">Të gjithë furnitorët</option>
+            {options.length > 0 && (
+              <optgroup label="Furnitorët">
+                {options.map((o) => <option key={o.id} value={`f:${o.id}`}>{o.label}</option>)}
+              </optgroup>
+            )}
+            {origins.length > 0 && (
+              <optgroup label="Origjina e hyrjes">
+                {origins.map((n) => <option key={n} value={`o:${n}`}>{n}</option>)}
+              </optgroup>
+            )}
+          </select>
         )}
         <select value={draft.statusi} onChange={(e) => setDraft({ ...draft, statusi: e.target.value })}>
           <option value="">Të gjitha</option>

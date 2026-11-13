@@ -206,6 +206,16 @@ export const PAGE = 50
 
 /** filters: { furnitorId, statusi, from, to } */
 export async function queryPurchases(filters = {}, cursor = null) {
+  // Sipas origjinës (tekst nga hyrja): pa indeks të veçantë – merren hyrjet e asaj origjine dhe renditen këtu.
+  if (filters.origjinaEmri) {
+    const snap = await getDocs(query(companyCol('purchases'), where('origjinaEmri', '==', filters.origjinaEmri), limit(1000)))
+    const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+      .filter((r) => (!filters.statusi || r.statusi === filters.statusi)
+        && (!filters.from || millis(r.data) >= filters.from.getTime())
+        && (!filters.to || millis(r.data) <= filters.to.getTime()))
+      .sort((a, b) => millis(b.data) - millis(a.data))
+    return { rows, cursor: null, more: false }
+  }
   const cons = []
   if (filters.furnitorId) cons.push(where('furnitorId', '==', filters.furnitorId))
   if (filters.statusi) cons.push(where('statusi', '==', filters.statusi))
