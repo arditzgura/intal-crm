@@ -21,7 +21,6 @@ import InventoryPage from './pages/inventory/InventoryPage'
 import PurchasesPage from './pages/purchases/PurchasesPage'
 import NewPurchasePage from './pages/purchases/NewPurchasePage'
 import PurchaseViewPage from './pages/purchases/PurchaseViewPage'
-import SalesPage from './pages/sales/SalesPage'
 import FinancePage from './pages/finance/FinancePage'
 import ReportsPage from './pages/reports/ReportsPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
@@ -39,7 +38,6 @@ const PAGES = {
   historiku: HistoryPage,
   inventari: InventoryPage,
   blerje: PurchasesPage,
-  shitjet: SalesPage,
   financa: FinancePage,
   raporte: ReportsPage,
   paneli: DashboardPage,
