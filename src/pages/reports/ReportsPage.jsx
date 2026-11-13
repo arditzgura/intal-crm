@@ -108,7 +108,8 @@ function groupKey(l, by, cById, iById) {
 }
 
 function groupLabel(key, by, cById, iById) {
-  if (by === 'klienti') return cById[key] ? `${cById[key].kodi} – ${cById[key].emri}` : key
+  // Emri / biznesi në fillim (renditja A–Z sipas emrit), pastaj kodi
+  if (by === 'klienti') return cById[key] ? `${cById[key].emri} – ${cById[key].kodi}` : key
   if (by === 'artikulli') return iById[key] ? `${iById[key].kodi} – ${iById[key].emri}` : key
   if (by === 'muaji') return key.split('-').reverse().join('/')
   return key
@@ -400,7 +401,7 @@ function AgingReport() {
   return (
     <>
       <Toolbar onCsv={() => downloadCsv(`borxhet_${toInputDate()}.csv`, ['Klienti', 'Qyteti', 'Monedha', 'Borxhi', ...BUCKETS.map(([, l]) => l)],
-        rows.map((r) => [`${r.client.kodi} ${r.client.emri}`, r.client.qyteti, r.monedha, formatMoney(r.borxhi), ...BUCKETS.map(([k]) => formatMoney(r[k]))]))}>
+        rows.map((r) => [`${r.client.emri} – ${r.client.kodi}`, r.client.qyteti, r.monedha, formatMoney(r.borxhi), ...BUCKETS.map(([k]) => formatMoney(r[k]))]))}>
         <span className="muted">Gjendja më {formatDate(new Date())}</span>
       </Toolbar>
       {error && <div className="alert error">{error}</div>}
@@ -422,7 +423,7 @@ function AgingReport() {
               {!loading && !rows.length && <tr><td colSpan={6} className="muted">Asnjë klient me borxh.</td></tr>}
               {!loading && as.sorted.map((r) => (
                 <tr key={`${r.client.id}${r.monedha}`}>
-                  <td><Link to={`/kliente/${r.client.id}`}>{r.client.kodi} – {r.client.emri}</Link></td>
+                  <td><Link to={`/kliente/${r.client.id}`}>{r.client.emri} – {r.client.kodi}</Link></td>
                   <td>{r.client.qyteti}</td>
                   <td className="num"><b>{formatMoney(r.borxhi, r.monedha)}</b></td>
                   {BUCKETS.map(([k]) => <td key={k} className={`num ${k === 'b60' && r[k] ? 'neg' : ''}`}>{r[k] ? formatMoney(r[k]) : ''}</td>)}
