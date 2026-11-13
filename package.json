@@ -10,6 +10,7 @@
     "dev:test": "vite --mode test"
   },
   "dependencies": {
+    "@fontsource-variable/manrope": "^5.1.1",
     "firebase": "^13.0.0",
     "html-to-image": "^1.11.13",
     "jspdf": "^4.2.1",

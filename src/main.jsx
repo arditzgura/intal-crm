@@ -4,6 +4,7 @@ import { HashRouter } from 'react-router-dom'
 import App from './App'
 import { configMissing } from './firebase'
 import { AuthProvider } from './hooks/useAuth'
+import '@fontsource-variable/manrope'
 import './styles.css'
 
 const root = createRoot(document.getElementById('root'))
