@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { getDocs, limit, orderBy, query, where } from 'firebase/firestore'
-import { Download, Printer } from 'lucide-react'
+import { Download, Printer, FileDown, ChevronDown } from 'lucide-react'
+import { downloadReportPdf } from '../../utils/exportReport'
 import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
 import { useSettings } from '../../hooks/useSettings'
@@ -125,7 +126,48 @@ function Toolbar({ children, onCsv }) {
       {children}
       <span className="grow" />
       <button type="button" className="btn" onClick={onCsv}><Download size={16} /> CSV</button>
-      <button type="button" className="btn" onClick={() => window.print()}><Printer size={16} /> Printo / PDF</button>
+      <PrintMenu />
+    </div>
+  )
+}
+
+/** "Printo / PDF": pyet nëse raporti do të printohet apo do të shkarkohet si PDF. */
+function PrintMenu() {
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    if (!open) return undefined
+    const close = () => setOpen(false)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [open])
+
+  async function pdf() {
+    setOpen(false)
+    const node = document.querySelector('.printable')
+    if (!node) return
+    const title = document.querySelector('.printable .tabs .tab.active')?.textContent?.trim() || 'Raport'
+    setBusy(true)
+    try {
+      await downloadReportPdf(node, `Raport_${title.replace(/[^\p{L}\p{N}]+/gu, '_')}_${toInputDate()}.pdf`)
+    } catch (err) {
+      window.alert(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="print-menu" onClick={(e) => e.stopPropagation()}>
+      <button type="button" className="btn" onClick={() => setOpen((o) => !o)} disabled={busy} aria-haspopup="menu" aria-expanded={open}>
+        <Printer size={16} /> {busy ? 'Duke krijuar PDF…' : 'Printo / PDF'} <ChevronDown size={14} />
+      </button>
+      {open && (
+        <div className="print-menu-list" role="menu">
+          <button type="button" role="menuitem" onClick={() => { setOpen(false); window.print() }}><Printer size={16} /> Printo raportin</button>
+          <button type="button" role="menuitem" onClick={pdf}><FileDown size={16} /> Shkarko si PDF</button>
+        </div>
+      )}
     </div>
   )
 }
