@@ -22,7 +22,7 @@ export default function PurchaseViewPage() {
 
   if (loading) return <div className="card muted">Duke u ngarkuar…</div>
   if (error) return <div className="alert error">{errorMessage(error)}</div>
-  if (!p) return <div className="card">Hyrja nuk u gjet. <Link to="/blerje">Blerje</Link></div>
+  if (!p) return <div className="card">Hyrja nuk u gjet. <Link to="/blerje">Fletëhyrje</Link></div>
 
   return (
     <div>

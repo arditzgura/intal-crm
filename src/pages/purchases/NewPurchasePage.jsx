@@ -130,7 +130,7 @@ export default function NewPurchasePage() {
   return (
     <div>
       <Link to="/blerje" className="back-link"><ArrowLeft size={16} /> Blerje</Link>
-      <h1 className="page-title">Hyrje e re malli</h1>
+      <h1 className="page-title">Fletëhyrje e re</h1>
 
       <div className="card">
         <div className="grid-3">

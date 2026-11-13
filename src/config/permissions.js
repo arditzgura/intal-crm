@@ -13,7 +13,7 @@ export const PERMISSION_GROUPS = [
       ['mod_kliente', 'Klientë'],
       ['mod_artikujt', 'Artikujt'],
       ['mod_shitjet', 'Shitjet (Dalje)'],
-      ['mod_blerje', 'Blerje (Hyrje)'],
+      ['mod_blerje', 'Fletëhyrje'],
       ['mod_financa', 'Financa (Cash Flow)'],
       ['mod_inventari', 'Inventari'],
       ['mod_raporte', 'Raporte'],

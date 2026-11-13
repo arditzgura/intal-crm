@@ -18,9 +18,9 @@ export default function PurchasesPage() {
   return (
     <div>
       <div className="page-head">
-        <h1 className="page-title">Blerje (Hyrje malli)</h1>
+        <h1 className="page-title">Fletëhyrje</h1>
         {perms.has('blerje_regjistro') && (
-          <button className="btn primary" onClick={() => navigate('/blerje/e-re')}><Plus size={16} /> Hyrje e re</button>
+          <button className="btn primary" onClick={() => navigate('/blerje/e-re')}><Plus size={16} /> Fletëhyrje e re</button>
         )}
       </div>
       <PurchaseList />

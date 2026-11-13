@@ -19,7 +19,7 @@ export const MODULES = [
   { key: 'kliente', label: 'Klientë', icon: 'Users', perm: 'mod_kliente', phase: 2 },
   { key: 'artikujt', label: 'Artikujt', icon: 'Package', perm: 'mod_artikujt', phase: 2 },
   { key: 'shitjet', label: 'Shitjet (Dalje)', icon: 'TrendingUp', perm: 'mod_shitjet', phase: 4 },
-  { key: 'blerje', label: 'Blerje (Hyrje)', icon: 'PackagePlus', perm: 'mod_blerje', phase: 4 },
+  { key: 'blerje', label: 'Fletëhyrje', icon: 'PackagePlus', perm: 'mod_blerje', phase: 4 },
   { key: 'financa', label: 'Financa (Cash Flow)', icon: 'Wallet', perm: 'mod_financa', phase: 5 },
   { key: 'inventari', label: 'Inventari', icon: 'Warehouse', perm: 'mod_inventari', phase: 4 },
   { key: 'raporte', label: 'Raporte', icon: 'BarChart3', perm: 'mod_raporte', phase: 5 },
