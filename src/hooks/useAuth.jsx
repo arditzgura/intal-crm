@@ -39,9 +39,19 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!user) return undefined
     let cancelled = false
+    let answered = false
+    // Nëse Firestore nuk përgjigjet (p.sh. baza e padisponueshme), mos ngec pafundësisht te "Duke u ngarkuar…".
+    const timer = setTimeout(() => {
+      if (cancelled || answered) return
+      const err = new Error('Baza e të dhënave (Firestore) nuk po përgjigjet. Provoni përsëri pas pak; nëse vazhdon, kontrolloni projektin te Firebase Console.')
+      err.code = 'timeout'
+      setError(err)
+      setStatus('error')
+    }, 15000)
     const unsub = watchUserProfile(
       user.uid,
       async (p) => {
+        answered = true
         if (cancelled) return
         setProfile(p)
         if (!p) {
@@ -74,6 +84,7 @@ export function AuthProvider({ children }) {
         }
       },
       (err) => {
+        answered = true
         if (cancelled) return
         setError(err)
         setStatus('error')
@@ -81,6 +92,7 @@ export function AuthProvider({ children }) {
     )
     return () => {
       cancelled = true
+      clearTimeout(timer)
       unsub()
     }
   }, [user, reloadKey])
