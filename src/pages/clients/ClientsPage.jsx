@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Plus, Search } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useLive } from '../../hooks/useLive'
 import { watchClients, ensureWalkInClient } from '../../services/clientService'
@@ -20,7 +20,8 @@ export default function ClientsPage() {
   const navigate = useNavigate()
   const { data: clients, loading, error } = useLive(watchClients, [], { initial: [] })
   const [q, setQ] = useState('')
-  const [tipi, setTipi] = useState('')
+  const [params] = useSearchParams()
+  const [tipi, setTipi] = useState(() => (CLIENT_TYPES[params.get('tipi')] ? params.get('tipi') : ''))
   const [statusi, setStatusi] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -67,8 +68,8 @@ export default function ClientsPage() {
         )}
       </div>
 
-      <div className="card filters">
-        <input className="grow" placeholder="Kërko me emër, kod, qytet, telefon, NIPT…" value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="card filters list-filters">
+        <label className="list-search grow"><Search size={17} /><input placeholder="Kërko me emër, kod, qytet, telefon, NIPT…" value={q} onChange={(e) => setQ(e.target.value)} /></label>
         <select value={tipi} onChange={(e) => setTipi(e.target.value)}>
           <option value="">Të gjithë tipet</option>
           {Object.entries(CLIENT_TYPES).map(([k, v]) => (
@@ -87,12 +88,11 @@ export default function ClientsPage() {
 
       {error && <div className="alert error">{errorMessage(error)}</div>}
 
-      <div className="card no-pad">
+      <div className="card no-pad list-card">
         <div className="table-wrap">
-          <table className="table clickable-rows">
+          <table className="table clickable-rows list-table">
             <thead>
               <tr>
-                <SortTh s={s} k="kodi">Kodi</SortTh>
                 <SortTh s={s} k="emri">Emri / Biznesi</SortTh>
                 <SortTh s={s} k="qyteti">Qyteti</SortTh>
                 <SortTh s={s} k="telefoni">Telefoni</SortTh>
@@ -104,17 +104,17 @@ export default function ClientsPage() {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={5 + currencies.length} className="muted">Duke u ngarkuar…</td></tr>
+                <tr><td colSpan={4 + currencies.length} className="muted">Duke u ngarkuar…</td></tr>
               )}
               {!loading && !paged.rows.length && (
-                <tr><td colSpan={5 + currencies.length} className="muted">Asnjë klient.</td></tr>
+                <tr><td colSpan={4 + currencies.length} className="muted">Asnjë klient.</td></tr>
               )}
               {paged.rows.map((c) => (
                 <tr key={c.id} onClick={() => navigate(`/kliente/${c.id}`)} className={c.arkivuar ? 'archived' : ''}>
-                  <td className="mono">{c.kodi}</td>
                   <td>
                     <b>{c.emri}</b>
                     {c.arkivuar && <span className="tag muted-tag">Arkivuar</span>}
+                    <div className="small muted">{c.kodi}{c.nipt ? ` · NIPT ${c.nipt}` : ''}</div>
                   </td>
                   <td>{c.qyteti}</td>
                   <td>{c.telefoni}</td>
@@ -130,7 +130,7 @@ export default function ClientsPage() {
             {filtered.length > 0 && (
               <tfoot>
                 <tr>
-                  <td colSpan={5} className="muted small">Totali i detyrimeve (klientët e filtruar)</td>
+                  <td colSpan={4} className="muted small">Totali i detyrimeve (klientët e filtruar)</td>
                   {currencies.map((c) => (
                     <td key={c} className="num"><Balance value={totals[c]} currency={c} /></td>
                   ))}

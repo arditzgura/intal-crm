@@ -23,6 +23,7 @@ import PurchaseViewPage from './pages/purchases/PurchaseViewPage'
 import FinancePage from './pages/finance/FinancePage'
 import ReportsPage from './pages/reports/ReportsPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
+import HubPage from './pages/hub/HubPage'
 import { errorMessage } from './services/authService'
 import { ensureCompanyInitialized } from './services/settingsService'
 import VerifyEmailPage from './pages/VerifyEmailPage'
@@ -140,6 +141,7 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/hub" element={<HubPage />} />
           <Route path="/profili" element={<ProfilePage />} />
           {isSuperAdmin && <Route path="/super-admin" element={<SuperAdminPage />} />}
           <Route path="*" element={<Navigate to={homePathFor(perms)} replace />} />

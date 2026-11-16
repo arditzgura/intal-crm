@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { ShieldCheck } from 'lucide-react'
+import { ShieldCheck, LayoutGrid } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useSettings } from '../hooks/useSettings'
 import { roleLabel, modulesFor } from '../config/roles'
@@ -39,6 +39,10 @@ export default function Sidebar() {
             <span>{primary.label}</span>
           </NavLink>
         )}
+        <NavLink to="/hub" className="nav-item">
+          <span className="nav-icon"><LayoutGrid size={18} /></span>
+          <span>Business Hub</span>
+        </NavLink>
         {rest.map((m) => (
           <NavLink key={m.key} to={`/${m.key}`} className="nav-item">
             <span className="nav-icon">

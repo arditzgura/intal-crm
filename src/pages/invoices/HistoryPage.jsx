@@ -145,7 +145,7 @@ export function InvoiceList({ fixedClientId, period: extPeriod, setPeriod: extSe
 
   return (
     <>
-      <div className="card history-filters">
+      <div className="card history-filters list-filters">
         {!extPeriod && <PeriodFilter period={period} setPeriod={setPeriod} />}
         <div className="search-row">
           <div className="search-box">
@@ -175,10 +175,10 @@ export function InvoiceList({ fixedClientId, period: extPeriod, setPeriod: extSe
 
       {preview && <InvoicePreview invoice={preview} onClose={() => setPreview(null)} />}
 
-      <div className="card no-pad">
+      <div className="card no-pad list-card">
         {s.sort && more && <div className="sort-hint">Renditja vlen për faturat e kësaj faqeje. Përdorni filtrat për të ngushtuar listën.</div>}
         <div className="table-wrap">
-          <table className="table clickable-rows history-table">
+          <table className="table clickable-rows history-table list-table">
             <thead>
               <tr>
                 <SortTh s={s} k="nr">Nr.</SortTh>

@@ -110,7 +110,7 @@ export function PurchaseList({ fixedSupplierId }) {
 
   return (
     <>
-      <form className="card filters" onSubmit={apply}>
+      <form className="card filters list-filters" onSubmit={apply}>
         <label className="inline-field">Nga <input type="date" value={draft.from} onChange={(e) => setDraft({ ...draft, from: e.target.value })} /></label>
         <label className="inline-field">Deri <input type="date" value={draft.to} onChange={(e) => setDraft({ ...draft, to: e.target.value })} /></label>
         {!fixedSupplierId && (
@@ -137,9 +137,9 @@ export function PurchaseList({ fixedSupplierId }) {
         <button type="button" className="btn" onClick={() => { setDraft(EMPTY); setPages([null]); setPage(0); setFilters(EMPTY) }}><X size={16} /></button>
       </form>
       {error && <div className="alert error">{error}</div>}
-      <div className="card no-pad">
+      <div className="card no-pad list-card">
         <div className="table-wrap">
-          <table className="table clickable-rows">
+          <table className="table clickable-rows list-table">
             <thead>
               <tr>
                 <SortTh s={s} k="nr">Nr.</SortTh>

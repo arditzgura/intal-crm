@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { StockTab, MovementsTab, CountSheet } from '../inventory/InventoryPage'
-import { Plus, Pencil, Trash2, ArchiveRestore, AlertTriangle, ShoppingCart, Layers } from 'lucide-react'
+import { Plus, Pencil, Trash2, ArchiveRestore, AlertTriangle, ShoppingCart, Layers, Search } from 'lucide-react'
 import PeriodFilter, { defaultPeriod } from '../../components/PeriodFilter'
 import { periodLabel, periodRange } from '../../utils/date'
 import { useAuth } from '../../hooks/useAuth'
@@ -184,8 +184,8 @@ function ArticlesList({ tabsBar }) {
         </div>
       </div>
 
-      <div className="card filters">
-        <input className="grow" placeholder="Kërko me kod ose emër…" value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="card filters list-filters">
+        <label className="list-search grow"><Search size={17} /><input placeholder="Kërko me kod ose emër…" value={q} onChange={(e) => setQ(e.target.value)} /></label>
         <select value={kat} onChange={(e) => { setKat(e.target.value); setNen('') }}>
           <option value="">Të gjitha kategoritë</option>
           {categories.map((c) => <option key={c.emri} value={c.emri}>{c.emri}</option>)}
@@ -203,9 +203,9 @@ function ArticlesList({ tabsBar }) {
       {actionError && <div className="alert error">{actionError}</div>}
       {!editable && <p className="muted small">Vetëm lexim.</p>}
 
-      <div className="card no-pad">
+      <div className="card no-pad list-card">
         <div className="table-wrap">
-          <table className="table clickable-rows items-table">
+          <table className="table clickable-rows items-table list-table">
             <thead>
               <tr>
                 <SortTh s={s} k="emri">Artikulli</SortTh>
