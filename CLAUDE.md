@@ -57,6 +57,7 @@ React + Vite, HashRouter, Firebase (Auth email/fjalëkalim + Firestore). Hosting
 - Rules: "mënyra e importit" (`meta/import.aktiv`, vetëm Admin) lejon shkrimin e dokumenteve historike; mbyllet pas importit.
 - Projekti i provës: `.env.test` (VITE_* e projektit test) + `npm run dev:test`; Rules publikohen me `--project <id-test>`.
 - Rules dhe indekset publikohen me `npx firebase-tools deploy --only firestore` (pyet para çdo deploy-i).
+- Baza e Firestore është **`intal`** (`FIRESTORE_DATABASE` te src/firebase, `firebase.json`), plani Blaze, me mbrojtje nga fshirja, PITR dhe backup ditor. `(default)` u fshi më 16.11.2026 – mos e përdor. Skriptet REST: `.../databases/intal/documents/...`.
 - Repo në GitHub: `intal-crm` (`base: '/intal-crm/'`). Repo-ja `intal-pro` është sistemi i vjetër – mos e prek.
 
 ## Paneli (lexime të pakta)

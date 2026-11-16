@@ -13,6 +13,10 @@ export const firebaseConfig = {
 
 export const configMissing = !firebaseConfig.apiKey || !firebaseConfig.projectId
 
+// Baza e Firestore: 'intal' (me mbrojtje nga fshirja, backup ditor dhe rikthim në kohë).
+// Baza e parë '(default)' u fshi më 16 nëntor 2026 dhe nuk përdoret më.
+export const FIRESTORE_DATABASE = import.meta.env.VITE_FIRESTORE_DATABASE || 'intal'
+
 // Kompania e parë (INTAL ALBANIA); konfigurimi fillestar i vjetër (meta/bootstrap) i referohet asaj.
 export const LEGACY_COMPANY_ID = import.meta.env.VITE_COMPANY_ID || 'intal'
 // Kompania aktive merret nga profili i përdoruesit pas hyrjes (users/{uid}.companyId).
@@ -28,5 +32,5 @@ export const auth = app ? getAuth(app) : null
 // serveri – lexohen vetëm dokumentet që kanë ndryshuar. Burimi i së vërtetës mbetet Firestore;
 // memoria pastrohet kur përdoruesi del (authService.logout).
 export const db = app
-  ? initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) })
+  ? initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }, FIRESTORE_DATABASE)
   : null
